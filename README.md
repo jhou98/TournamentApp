@@ -49,10 +49,3 @@ npm run test
 npm run build
 npm run db:studio        # Prisma Studio
 ```
-
-## Status
-
-**Phase 0 Part 0 — foundational scaffold: complete.** Monorepo, hexagonal server
-skeleton, full Phase-0 Prisma schema + migration + seed, and a DB-backed health-check
-vertical slice proving every layer. See the design doc for the full roadmap; the next
-part is auth + roster + captains (US1–US3).
