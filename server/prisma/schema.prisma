@@ -1,0 +1,268 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- Enums ---------------------------------------------------------------
+
+enum TournamentStatus {
+  setup
+  round_robin
+  playoffs
+  completed
+}
+
+enum MembershipRole {
+  captain
+  member
+}
+
+enum MatchupStage {
+  round_robin
+  semifinal
+  final
+}
+
+enum MatchupStatus {
+  scheduled
+  in_progress
+  final
+}
+
+enum GameStatus {
+  awaiting_lineups
+  assigned
+  final
+}
+
+// --- Core tables (Phase 0) ------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  isAdmin      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  invitesCreated   SignupInvite[] @relation("InviteCreatedBy")
+  invitesUsed      SignupInvite[] @relation("InviteUsedBy")
+  memberships      Membership[]
+  submittedLineups Lineup[]       @relation("LineupSubmittedBy")
+  finalizedGames   Game[]         @relation("GameFinalizedBy")
+  pairAppearances  PairPlayer[]
+  suddenDeathAsA   SuddenDeath[]  @relation("SuddenDeathTeamARep")
+  suddenDeathAsB   SuddenDeath[]  @relation("SuddenDeathTeamBRep")
+
+  @@map("user")
+}
+
+model SignupInvite {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  grantsAdmin Boolean   @default(false)
+  createdBy   String
+  expiresAt   DateTime?
+  usedBy      String?
+  usedAt      DateTime?
+
+  creator User  @relation("InviteCreatedBy", fields: [createdBy], references: [id])
+  user    User? @relation("InviteUsedBy", fields: [usedBy], references: [id])
+
+  @@map("signup_invite")
+}
+
+model Tournament {
+  id     String           @id @default(cuid())
+  name   String
+  status TournamentStatus @default(setup)
+
+  // Tournament config (§4) — editable while status = setup
+  teamCount         Int
+  teamSize          Int
+  pairSize          Int
+  pairsPerLineup    Int
+  roundsPerMatchup  Int
+  playoffQualifiers Int
+  courtCount        Int
+  coinRule          Json
+  streakRule        Json
+  suddenDeathRule   Json
+
+  createdAt DateTime @default(now())
+
+  teams    Team[]
+  matchups Matchup[]
+  courts   Court[]
+
+  @@map("tournament")
+}
+
+model Team {
+  id           String   @id @default(cuid())
+  tournamentId String
+  name         String
+  createdAt    DateTime @default(now())
+
+  tournament   Tournament    @relation(fields: [tournamentId], references: [id])
+  memberships  Membership[]
+  matchupsAsA  Matchup[]     @relation("MatchupTeamA")
+  matchupsAsB  Matchup[]     @relation("MatchupTeamB")
+  matchupsWon  Matchup[]     @relation("MatchupWinner")
+  lineups      Lineup[]
+  suddenDeathA SuddenDeath[] @relation("SuddenDeathTeamA")
+  suddenDeathB SuddenDeath[] @relation("SuddenDeathTeamB")
+  suddenDeathW SuddenDeath[] @relation("SuddenDeathWinner")
+
+  @@unique([tournamentId, name])
+  @@map("team")
+}
+
+model Membership {
+  id           String         @id @default(cuid())
+  userId       String
+  teamId       String
+  tournamentId String
+  role         MembershipRole
+  createdAt    DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, tournamentId])
+  @@map("membership")
+}
+
+model Matchup {
+  id           String        @id @default(cuid())
+  tournamentId String
+  stage        MatchupStage
+  roundIndex   Int?
+  bracketSlot  String?
+  teamAId      String
+  teamBId      String
+  status       MatchupStatus @default(scheduled)
+  winnerTeamId String?
+  createdAt    DateTime      @default(now())
+
+  tournament  Tournament   @relation(fields: [tournamentId], references: [id])
+  teamA       Team         @relation("MatchupTeamA", fields: [teamAId], references: [id])
+  teamB       Team         @relation("MatchupTeamB", fields: [teamBId], references: [id])
+  winnerTeam  Team?        @relation("MatchupWinner", fields: [winnerTeamId], references: [id])
+  lineups     Lineup[]
+  games       Game[]
+  suddenDeath SuddenDeath?
+
+  @@map("matchup")
+}
+
+model Court {
+  id           String @id @default(cuid())
+  tournamentId String
+  label        String
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  games      Game[]
+
+  @@map("court")
+}
+
+model Lineup {
+  id          String    @id @default(cuid())
+  matchupId   String
+  teamId      String
+  roundNo     Int
+  submittedBy String
+  locked      Boolean   @default(false)
+  lockedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  matchup   Matchup @relation(fields: [matchupId], references: [id])
+  team      Team    @relation(fields: [teamId], references: [id])
+  submitter User    @relation("LineupSubmittedBy", fields: [submittedBy], references: [id])
+  pairs     Pair[]
+
+  @@unique([matchupId, teamId, roundNo])
+  @@map("lineup")
+}
+
+model Pair {
+  id       String @id @default(cuid())
+  lineupId String
+  slot     Int
+
+  lineup      Lineup       @relation(fields: [lineupId], references: [id])
+  players     PairPlayer[]
+  gamesAsHome Game[]       @relation("GameHomePair")
+  gamesAsAway Game[]       @relation("GameAwayPair")
+  gamesWon    Game[]       @relation("GameWinnerPair")
+
+  @@unique([lineupId, slot])
+  @@map("pair")
+}
+
+model PairPlayer {
+  id         String @id @default(cuid())
+  pairId     String
+  userId     String
+  slotInPair Int
+
+  pair Pair @relation(fields: [pairId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([pairId, userId])
+  @@unique([pairId, slotInPair])
+  @@map("pair_player")
+}
+
+model Game {
+  id           String     @id @default(cuid())
+  matchupId    String
+  roundNo      Int
+  courtId      String?
+  homePairId   String?
+  awayPairId   String?
+  scoreHome    Int?
+  scoreAway    Int?
+  winnerPairId String?
+  status       GameStatus @default(awaiting_lineups)
+  finalizedBy  String?
+  finalizedAt  DateTime?
+  createdAt    DateTime   @default(now())
+
+  matchup    Matchup @relation(fields: [matchupId], references: [id])
+  court      Court?  @relation(fields: [courtId], references: [id])
+  homePair   Pair?   @relation("GameHomePair", fields: [homePairId], references: [id])
+  awayPair   Pair?   @relation("GameAwayPair", fields: [awayPairId], references: [id])
+  winnerPair Pair?   @relation("GameWinnerPair", fields: [winnerPairId], references: [id])
+  finalizer  User?   @relation("GameFinalizedBy", fields: [finalizedBy], references: [id])
+
+  @@map("game")
+}
+
+model SuddenDeath {
+  id           String   @id @default(cuid())
+  matchupId    String   @unique
+  teamARep     String
+  teamBRep     String
+  teamAId      String
+  teamBId      String
+  scoreA       Int
+  scoreB       Int
+  winnerTeamId String
+  createdAt    DateTime @default(now())
+
+  matchup    Matchup @relation(fields: [matchupId], references: [id])
+  repA       User    @relation("SuddenDeathTeamARep", fields: [teamARep], references: [id])
+  repB       User    @relation("SuddenDeathTeamBRep", fields: [teamBRep], references: [id])
+  teamA      Team    @relation("SuddenDeathTeamA", fields: [teamAId], references: [id])
+  teamB      Team    @relation("SuddenDeathTeamB", fields: [teamBId], references: [id])
+  winnerTeam Team    @relation("SuddenDeathWinner", fields: [winnerTeamId], references: [id])
+
+  @@map("sudden_death")
+}
