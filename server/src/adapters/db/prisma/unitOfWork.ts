@@ -1,10 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
+import { runInTransaction } from "./client.js";
 import type { UnitOfWork } from "../../../ports/index.js";
 
-export function makePrismaUnitOfWork(prisma: PrismaClient): UnitOfWork {
+export function makePrismaUnitOfWork(): UnitOfWork {
   return {
-    async run<T>(work: () => Promise<T>): Promise<T> {
-      return prisma.$transaction(async () => work());
+    run<T>(work: () => Promise<T>): Promise<T> {
+      return runInTransaction(work);
     },
   };
 }

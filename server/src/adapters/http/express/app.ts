@@ -1,3 +1,4 @@
+import "./types.js";
 import express, { type Express, Router } from "express";
 import cookieParser from "cookie-parser";
 import fs from "node:fs";
@@ -5,6 +6,9 @@ import path from "node:path";
 import type { Container } from "../../../config/container.js";
 import { errorMiddleware } from "./errorMiddleware.js";
 import { healthRouter } from "./routes/health.js";
+import { authRouter } from "./routes/auth.js";
+import { meRouter } from "./routes/me.js";
+import { adminRouter } from "./routes/admin.js";
 
 export function createApp(container: Container): Express {
   const app = express();
@@ -14,6 +18,9 @@ export function createApp(container: Container): Express {
 
   const api = Router();
   api.use("/health", healthRouter(container.services.health));
+  api.use("/auth", authRouter(container.services.auth));
+  api.use("/me", meRouter(container.services.auth, container.authMiddleware));
+  api.use("/admin", adminRouter(container.services.roster, container.authMiddleware));
   app.use("/api", api);
 
   // Serve the built SPA in production, with history fallback for client routes.
