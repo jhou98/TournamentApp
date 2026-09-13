@@ -1,8 +1,15 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 const DEFAULT_TOURNAMENT_ID = "default-tournament";
+
+/** Demo players seeded for local dev — all share the password "password". */
+const DEMO_PLAYERS = [3, 4, 5, 6, 7, 8, 9, 10].map((n) => ({
+  username: `player${n}`,
+  displayName: `Player ${n}`,
+}));
 
 async function main() {
   const tournament = await prisma.tournament.upsert({
@@ -34,6 +41,30 @@ async function main() {
   });
 
   console.log(`Seeded default tournament: ${tournament.id} (${tournament.name})`);
+
+  // Demo players are gated behind SEED_DEMO_USERS so they only appear where you
+  // opt in (local/testing) — never in prod unless the flag is explicitly set.
+  if (process.env.SEED_DEMO_USERS !== "true") {
+    console.log("Skipping demo players (set SEED_DEMO_USERS=true to seed them).");
+    return;
+  }
+
+  // Idempotent by username; existing rows are left untouched so a re-seed never
+  // rewrites a password someone already changed.
+  const passwordHash = await bcrypt.hash("password", 10);
+  for (const p of DEMO_PLAYERS) {
+    const user = await prisma.user.upsert({
+      where: { username: p.username },
+      update: {},
+      create: {
+        username: p.username,
+        displayName: p.displayName,
+        passwordHash,
+        isAdmin: false,
+      },
+    });
+    console.log(`Seeded player: ${user.username} (${user.displayName})`);
+  }
 }
 
 main()
