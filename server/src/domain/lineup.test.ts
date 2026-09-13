@@ -90,7 +90,7 @@ describe("describeLineupProblem", () => {
 
   it("renders player problems with names, never ids", () => {
     const msg = describeLineupProblem({ kind: "player_reused", playerId: "p1" }, nameOf);
-    expect(msg).toBe("Alice is used in more than one pair this round");
+    expect(msg).toBe("Alice is used in more than one pair this match");
     expect(msg).not.toContain("p1");
   });
 

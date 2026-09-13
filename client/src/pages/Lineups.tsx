@@ -217,7 +217,7 @@ export function Lineups() {
 
           {ctx.rounds.map((round) => (
             <div key={round.roundNo} style={{ marginBottom: 20 }}>
-              <h3 style={{ fontSize: 16, margin: "10px 0 4px" }}>Round {round.roundNo}</h3>
+              <h3 style={{ fontSize: 16, margin: "10px 0 4px" }}>Match {round.roundNo}</h3>
 
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                 {[round.teamA, round.teamB].map((side) => (
@@ -238,7 +238,7 @@ export function Lineups() {
 
               {round.revealed && (
                 <div style={cardStyle}>
-                  <strong>Matchups (revealed)</strong>
+                  <strong>Pairings (revealed)</strong>
                   <table style={{ fontSize: 13, marginTop: 6 }}>
                     <tbody>
                       {round.games.map((g, i) => (

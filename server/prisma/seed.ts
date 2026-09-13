@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const DEFAULT_TOURNAMENT_ID = "default-tournament";
 
 /** Demo players seeded for local dev — all share the password "password". */
-const DEMO_PLAYERS = [3, 4, 5, 6, 7, 8, 9, 10].map((n) => ({
+const DEMO_PLAYERS = Array.from({ length: 16 }, (_, i) => i + 1).map((n) => ({
   username: `player${n}`,
   displayName: `Player ${n}`,
 }));

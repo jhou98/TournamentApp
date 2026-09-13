@@ -73,7 +73,7 @@ function MatchupCard({ matchup }: { matchup: MatchupView }) {
       </strong>
       {[...byRound.entries()].map(([roundNo, games]) => (
         <div key={roundNo} style={{ margin: "6px 0", fontSize: 14 }}>
-          <em>Round {roundNo}:</em>{" "}
+          <em>Match {roundNo}:</em>{" "}
           {games.map((g) => g.courtLabel ?? "—").join(", ")}
         </div>
       ))}

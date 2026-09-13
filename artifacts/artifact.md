@@ -131,11 +131,20 @@ random matchups → results → standings → playoffs, not the UI). **P1 = econ
 
 | Term | Definition |
 |------|------------|
+| **Round** | A round-robin **slate**: the grouping in which every team plays once (count derived from `team_count`). `round_robin_cycles` repeats the whole set of rounds. *(field: `round_index`)* |
 | **Team** | A flat group of players with exactly **one captain**. No sub-teams. |
-| **Matchup** | One team vs. another; consists of `rounds_per_matchup` (2) doubles **rounds**. |
-| **Round** | Within a matchup, each team fields `pairs_per_lineup` (3) pairs → that many doubles **games**. |
+| **Matchup** | One team vs. another within a round; consists of `rounds_per_matchup` (2) **matches**. |
+| **Match** | One doubles round *inside* a matchup: each team fields `pairs_per_lineup` (3) pairs → that many **games**. *(fields: `round_no` per game/lineup, `rounds_per_matchup` config)* |
+| **Game** | A single doubles game — one home pair vs. one away pair. |
+| **Set** | *Future (not built):* a scoring unit within a game; a game may be played as multiple sets. |
 | **Pair** | `pair_size` (2) players fielded together in one game. |
-| **Lineup** | One team's set of pairs for one round of a matchup — submitted & locked by the captain. |
+| **Lineup** | One team's set of pairs for one **match** of a matchup — submitted & locked by the captain. |
+
+> **On the word "round":** the round-robin **Round** (a slate of matchups, `round_index`)
+> is a *different* level from a **Match** (a doubles round inside one matchup, `round_no` /
+> `rounds_per_matchup`). The hierarchy is **Round → Matchup → Match → Game → (future) Set**.
+> The code keeps the `round_index` / `round_no` / `rounds_per_matchup` identifiers; the UI
+> uses the words **Round / Match / Set**.
 
 *"Coins" is a placeholder name — rename freely.*
 
@@ -184,7 +193,7 @@ Stored on the `tournament` row (or a small `settings` table); editable while
 | `team_size` | 6 | Players per team (validate as a min/max range, not a hard equal) |
 | `pair_size` | 2 | Players per pair (doubles = 2) |
 | `pairs_per_lineup` | 3 | Pairs each team fields per round ⇒ games per round |
-| `rounds_per_matchup` | 2 | Doubles rounds in one team matchup |
+| `rounds_per_matchup` | 2 | **Matches** (doubles rounds) in one team matchup — UI: "Matches / matchup" |
 | `round_robin_cycles` | 1 | How many times the whole round robin repeats (2 = double round robin) |
 | `playoff_qualifiers` | 4 | Top-N teams that advance to the seeded bracket |
 | `court_count` | 6 | Courts available for concurrent games |

@@ -181,7 +181,7 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
 
   function validateRound(roundNo: number, t: TournamentDetail): void {
     if (!Number.isInteger(roundNo) || roundNo < 1 || roundNo > t.roundsPerMatchup) {
-      throw new ValidationError(`roundNo must be between 1 and ${t.roundsPerMatchup}`);
+      throw new ValidationError(`Match number must be between 1 and ${t.roundsPerMatchup}`);
     }
   }
 

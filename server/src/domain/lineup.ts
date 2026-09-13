@@ -109,7 +109,7 @@ export function describeLineupProblem(
     case "duplicate_in_pair":
       return `${nameOf(problem.playerId)} appears twice in pair ${problem.pairIndex + 1}`;
     case "player_reused":
-      return `${nameOf(problem.playerId)} is used in more than one pair this round`;
+      return `${nameOf(problem.playerId)} is used in more than one pair this match`;
     case "duplicate_pair_in_lineup":
       return `Pair ${problem.pairIndex + 1} repeats an identical pairing in this lineup`;
     case "pairing_reused":

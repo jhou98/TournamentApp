@@ -31,7 +31,7 @@ const CONFIG_FIELDS: { key: ConfigKey; label: string }[] = [
   { key: "teamSize", label: "Players / team" },
   { key: "pairSize", label: "Players / pair" },
   { key: "pairsPerLineup", label: "Pairs / round" },
-  { key: "roundsPerMatchup", label: "Rounds / matchup" },
+  { key: "roundsPerMatchup", label: "Matches / matchup" },
   { key: "roundRobinCycles", label: "Round-robin cycles" },
   { key: "playoffQualifiers", label: "Playoff qualifiers" },
   { key: "courtCount", label: "Courts" },
@@ -203,7 +203,7 @@ export function AdminSchedule() {
                   {m.games.map((g, i) => (
                     <tr key={g.id}>
                       <td style={{ paddingRight: 8 }}>
-                        R{g.roundNo} · game {i + 1}
+                        Match {g.roundNo} · game {i + 1}
                       </td>
                       <td>
                         <select
