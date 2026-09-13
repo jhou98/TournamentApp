@@ -151,14 +151,19 @@ export function Lineups() {
     );
   }
   function lock(teamId: string, roundNo: number) {
-    return run(
-      () =>
-        api(`/matchups/${selected}/lineups/lock`, {
-          method: "POST",
-          body: JSON.stringify({ teamId, roundNo }),
-        }),
-      "Lineup locked.",
-    );
+    // Save the current draft first so "Lock" also commits any pending edits
+    // (a no-op when nothing changed) — one click to lock without a prior save.
+    const pairs = drafts[keyOf(teamId, roundNo)] ?? [];
+    return run(async () => {
+      await api(`/matchups/${selected}/lineups`, {
+        method: "POST",
+        body: JSON.stringify({ teamId, roundNo, pairs }),
+      });
+      await api(`/matchups/${selected}/lineups/lock`, {
+        method: "POST",
+        body: JSON.stringify({ teamId, roundNo }),
+      });
+    }, "Lineup saved & locked.");
   }
   function unlock(teamId: string, roundNo: number) {
     return run(
