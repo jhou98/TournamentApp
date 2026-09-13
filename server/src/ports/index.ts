@@ -30,6 +30,7 @@ export type {
   GameStatus,
   NewGame,
   PairAssignmentInput,
+  ScoreInput,
 } from "./GameRepo.js";
 export type {
   LineupRepo,

@@ -2,9 +2,23 @@
 
 > **Status:** Living design doc. **Implementation in progress** — Phase 0 Part 0
 > (foundation + health), Part 1 (auth, roster, captains — US1–US3), Part 2
-> (round-robin schedule generation + court assignment — US4–US5), and Part 3
-> (captain lineups, validation, random pair assignment — US6–US8) have landed.
-> Owner: @jhou98. Last updated: 2026-09-12.
+> (round-robin schedule generation + court assignment — US4–US5), Part 3
+> (captain lineups, validation, random pair assignment — US6–US8), and Part 4
+> (match scoring + standings/seeding — US9–US10) have landed.
+> Owner: @jhou98. Last updated: 2026-09-13.
+>
+> **Changelog (2026-09-13) — Part 4:** US9–US10 shipped. Admins enter/edit a per-game
+> score via `PATCH /api/admin/games/:id` (`{scoreHome, scoreAway, courtId?}`); a game must
+> have assigned pairs, scores are non-negative ints, and a tie is rejected (badminton games
+> have a winner). Scoring sets the winning pair, marks the game `final`, and **recomputes the
+> matchup**: per-match round score (e.g. `2–1`) and overall matchup score auto-derive; a
+> decided matchup sets `winnerTeamId` + `status = final`, a level game tally stays
+> `in_progress` awaiting sudden death (US12). Editing a final result re-derives everything
+> (US9). New `GET /api/results` (per-matchup match/matchup scores, revealed pairs) and
+> `GET /api/standings` (record → game diff → point diff → name; final ranks seed playoffs)
+> are read-only for any signed-in user, plus **Results** and **Standings** pages. Standings
+> are **derived at view time** (no `standing` table). No schema change — the `game` score
+> columns and `matchup.status`/`winnerTeamId` were already modeled in Part 2.
 >
 > **Changelog (2026-09-12) — Part 3:** US6–US8 shipped. Captains (or admins) submit
 > `pairs_per_lineup` doubles pairs per round from their roster; validation enforces the
@@ -80,6 +94,7 @@ random matchups → results → standings → playoffs, not the UI). **P1 = econ
 | US10 | Standings track team record, games won/lost, **game differential**, ranking; auto-rank by **record → differential → tiebreaker**; final standings seed playoffs |
 | US11 | **Playoffs:** semifinals **#1 vs #4** and **#2 vs #3**, each two rounds of 3 doubles (new pairs + random matchups per round); most total wins advances; **finals** use the same format and declare the champion |
 | US12 | **Sudden death** on a **3–3** playoff/final: captain picks one eligible representative, admin enters the result separately (**1v1, first to 5, win by 2, cap 7**); winner advances |
+| US28 | **Multi-tournament + per-tournament access:** admin creates and manages **multiple tournaments**, each with its own config, teams, schedule, results, standings, **and coin ledger**; a signed-in user sees only the tournaments whose team they belong to (admins see all), and picks the active one; **all data — including coins/economy — is scoped by `tournament_id`** so nothing (least of all balances) bleeds across events. **Minimum bar:** even before full per-event scoping lands, an admin can **reset all coin balances for a tournament** so a new event starts clean |
 
 ### P1 — Economy (Phase 1)
 
@@ -112,8 +127,9 @@ random matchups → results → standings → playoffs, not the UI). **P1 = econ
 | US27 | Tournament **history / activity log** view, animations, and a **mobile-friendly** interface |
 
 > **Removed vs. prior artifact:** sub-team hierarchy, **team** coin wallets (coins
-> are now per-player), Excel import, and multi-tournament / open-join invites — the
-> tournament is a single fixed-shape event. **Notifications** are intentionally omitted.
+> are now per-player), Excel import, and **open-join / self-serve invites** (admin assigns
+> rosters, D3). **Notifications** are intentionally omitted. *(Multi-tournament is back
+> **in** scope as a P0 story — US28 / D6 — so coins and everything else scope per event.)*
 
 ---
 
@@ -234,8 +250,8 @@ Stored on the `tournament` row (or a small `settings` table); editable while
 
 ### Economy tables (P1) — coins are **per player**
 
-**coin_transaction** — `id`, `user_id`, `delta` (signed int), `reason` (`match_result` | `streak_bonus` | `mission` | `bounty` | `event` | `purchase` | `admin_adjust`), `game_id` (nullable), `mission_id` (nullable), `bounty_id` (nullable), `purchase_id` (nullable), `note`, `created_at`
-*(a player's balance = `SUM(delta)`. Editing a final game **reverses** its old entries and writes new ones → always consistent. Manual `admin_adjust` is the escape hatch and every row is auditable.)*
+**coin_transaction** — `id`, `tournament_id`, `user_id`, `delta` (signed int), `reason` (`match_result` | `streak_bonus` | `mission` | `bounty` | `event` | `purchase` | `admin_adjust`), `game_id` (nullable), `mission_id` (nullable), `bounty_id` (nullable), `purchase_id` (nullable), `note`, `created_at`
+*(**scoped by `tournament_id`** (US28/D6) — a player's balance in a tournament = `SUM(delta)` over that tournament's rows, so coins never bleed between events. Editing a final game **reverses** its old entries and writes new ones → always consistent. Manual `admin_adjust` is the escape hatch and every row is auditable. An admin **coin reset** for a tournament is a batch of reversing `admin_adjust` rows (auditable, not a delete) that zeroes every balance in that event.)*
 
 **bounty** — `id`, `tournament_id`, `target_type` (`player` | `team`), `target_id`, `description`, `coin_value`, `condition_meta` (JSON), `active`, `created_at`
 *(bounties **stack**; on a qualifying result the system writes a `bounty` coin_transaction. Admin can add custom bounties mid-tournament.)*
@@ -451,7 +467,7 @@ between captains → lineups → randomized matchups → results → standings �
 | **D3** | Roster assignment | **Admin assigns** players to teams and names **one captain** per team; optional **auto-balance** from the player pool. No self-join codes. |
 | **D4** | Coin earning | **Pluggable rule** (config + pure `computeCoinDelta`), credited **per player**. Default from the brief: win 100 / close-loss 75 / loss 50 — admin-tunable. |
 | **D5** | Auth transport | httpOnly cookie + JWT. |
-| **D6** | Tournament scope | **One configurable tournament**; `tournament_id` on rows for cleanliness. **Multi-tournament / open-join UI dropped** from scope. |
+| **D6** | Tournament scope | **Multi-tournament (US28).** Admin creates/manages many tournaments; every row already carries `tournament_id`, so the work is a tournament CRUD surface + replacing the "current tournament" `findFirst` with an explicit active-tournament id per request + membership-based access (a user sees a tournament only if they're on a team in it; admins see all). **Coins/economy scope by `tournament_id` too** (add it to `coin_transaction`), and an admin can **reset a tournament's coin balances**. *(Supersedes the earlier "one tournament, multi-tournament dropped" call — kept single only through Parts 0–4.)* **Open-join / self-serve invites stay out of scope** (admin assigns rosters, D3). |
 | **D7** | Coin scope | **Per player** (individual balances), not per team. |
 | **D8** | DB/ORM | **Prisma + Postgres on Neon** (free tier, managed). Docker Postgres locally → clean migrations. Plain Postgres to stay portable (Neon↔Supabase↔RDS). |
 | **D9** | Hosting | **Stateless box** (EC2 free-tier / Lightsail) serves API + SPA; data in **Neon**. Box is disposable. |

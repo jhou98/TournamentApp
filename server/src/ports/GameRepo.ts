@@ -13,6 +13,9 @@ export interface GameRecord {
   courtId: string | null;
   homePairId: string | null;
   awayPairId: string | null;
+  scoreHome: number | null;
+  scoreAway: number | null;
+  winnerPairId: string | null;
   status: GameStatus;
 }
 
@@ -22,11 +25,22 @@ export interface PairAssignmentInput {
   awayPairId: string;
 }
 
+export interface ScoreInput {
+  scoreHome: number;
+  scoreAway: number;
+  winnerPairId: string | null;
+  finalizedBy: string;
+  courtId?: string;
+}
+
 export interface GameRepo {
   createMany(games: NewGame[]): Promise<void>;
   findById(id: string): Promise<GameRecord | null>;
   listByMatchup(matchupId: string): Promise<GameRecord[]>;
+  listByTournament(tournamentId: string): Promise<GameRecord[]>;
   setCourt(id: string, courtId: string): Promise<GameRecord>;
+  /** Enter/edit a final score, set the winning pair, and mark the game `final` (US9). */
+  setScore(id: string, score: ScoreInput): Promise<GameRecord>;
   /** Fill home/away pairs on games and move them to `assigned` (US8). */
   assignPairs(assignments: PairAssignmentInput[]): Promise<void>;
   /** Clear pair assignments for a round, reverting non-final games to `awaiting_lineups`. */

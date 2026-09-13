@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ValidationError } from "../../../../domain/errors.js";
 import type { RosterService } from "../../../../services/rosterService.js";
 import type { ScheduleService } from "../../../../services/scheduleService.js";
+import type { ResultsService } from "../../../../services/resultsService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { asyncHandler } from "../asyncHandler.js";
 import { requireParam } from "../params.js";
@@ -46,11 +47,24 @@ const editMatchupSchema = z.object({
   teamBId: z.string().min(1),
 });
 const renameCourtSchema = z.object({ label: z.string().trim().min(1).max(60) });
-const reassignCourtSchema = z.object({ courtId: z.string().min(1) });
+// A game edit may enter/edit a score, reassign a court, or both (US9 + Part 2).
+const editGameSchema = z
+  .object({
+    scoreHome: z.number().int().nonnegative().optional(),
+    scoreAway: z.number().int().nonnegative().optional(),
+    courtId: z.string().min(1).optional(),
+  })
+  .refine((v) => (v.scoreHome === undefined) === (v.scoreAway === undefined), {
+    message: "Provide both scoreHome and scoreAway together",
+  })
+  .refine((v) => v.scoreHome !== undefined || v.courtId !== undefined, {
+    message: "Provide a score and/or a courtId",
+  });
 
 export function adminRouter(
   roster: RosterService,
   schedule: ScheduleService,
+  results: ResultsService,
   mw: AuthMiddleware,
 ): Router {
   const router = Router();
@@ -200,8 +214,17 @@ export function adminRouter(
   router.patch(
     "/games/:id",
     asyncHandler(async (req, res) => {
-      const { courtId } = parse(reassignCourtSchema, req.body);
-      await schedule.reassignCourt(requireParam(req, "id"), courtId);
+      const body = parse(editGameSchema, req.body);
+      const gameId = requireParam(req, "id");
+      if (body.scoreHome !== undefined && body.scoreAway !== undefined) {
+        await results.enterScore(req.user!, gameId, {
+          scoreHome: body.scoreHome,
+          scoreAway: body.scoreAway,
+          ...(body.courtId ? { courtId: body.courtId } : {}),
+        });
+      } else if (body.courtId) {
+        await schedule.reassignCourt(gameId, body.courtId);
+      }
       res.status(204).end();
     }),
   );

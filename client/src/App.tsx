@@ -6,6 +6,8 @@ import { Profile } from "./pages/Profile";
 import { Admin } from "./pages/Admin";
 import { Schedule } from "./pages/Schedule";
 import { Lineups } from "./pages/Lineups";
+import { Results } from "./pages/Results";
+import { Standings } from "./pages/Standings";
 
 function Nav() {
   const { profile, logout } = useAuth();
@@ -14,6 +16,8 @@ function Nav() {
     <nav style={navStyle}>
       <Link to="/">Profile</Link>
       <Link to="/schedule">Schedule</Link>
+      <Link to="/standings">Standings</Link>
+      <Link to="/results">Results</Link>
       {(profile.role === "captain" || profile.role === "admin") && <Link to="/lineups">Lineups</Link>}
       {profile.role === "admin" && <Link to="/admin">Admin</Link>}
       <span style={{ marginLeft: "auto" }}>
@@ -52,6 +56,22 @@ function Shell() {
           element={
             <RequireAuth>
               <Schedule />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/standings"
+          element={
+            <RequireAuth>
+              <Standings />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/results"
+          element={
+            <RequireAuth>
+              <Results />
             </RequireAuth>
           }
         />

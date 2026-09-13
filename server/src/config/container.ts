@@ -18,6 +18,7 @@ import { makeAuthService, type AuthService } from "../services/authService.js";
 import { makeRosterService, type RosterService } from "../services/rosterService.js";
 import { makeScheduleService, type ScheduleService } from "../services/scheduleService.js";
 import { makeLineupService, type LineupService } from "../services/lineupService.js";
+import { makeResultsService, type ResultsService } from "../services/resultsService.js";
 import type { UnitOfWork } from "../ports/index.js";
 import type { Env } from "./env.js";
 
@@ -30,6 +31,7 @@ export interface Container {
     roster: RosterService;
     schedule: ScheduleService;
     lineups: LineupService;
+    results: ResultsService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -94,6 +96,18 @@ export function buildContainer(env: Env): Container {
     uow: unitOfWork,
   });
 
+  const results = makeResultsService({
+    tournaments,
+    matchups,
+    teams,
+    memberships,
+    users,
+    courts,
+    lineups,
+    games: gamesRepo,
+    uow: unitOfWork,
+  });
+
   return {
     env,
     unitOfWork,
@@ -103,6 +117,7 @@ export function buildContainer(env: Env): Container {
       roster,
       schedule,
       lineups: lineupService,
+      results,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };
