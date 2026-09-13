@@ -6,12 +6,16 @@ import { makePrismaTeamRepo } from "../adapters/db/prisma/teamRepo.js";
 import { makePrismaMembershipRepo } from "../adapters/db/prisma/membershipRepo.js";
 import { makePrismaInviteRepo } from "../adapters/db/prisma/inviteRepo.js";
 import { makePrismaTournamentRepo } from "../adapters/db/prisma/tournamentRepo.js";
+import { makePrismaCourtRepo } from "../adapters/db/prisma/courtRepo.js";
+import { makePrismaMatchupRepo } from "../adapters/db/prisma/matchupRepo.js";
+import { makePrismaGameRepo } from "../adapters/db/prisma/gameRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
 import { makeHealthService, type HealthService } from "../services/healthService.js";
 import { makeAuthService, type AuthService } from "../services/authService.js";
 import { makeRosterService, type RosterService } from "../services/rosterService.js";
+import { makeScheduleService, type ScheduleService } from "../services/scheduleService.js";
 import type { UnitOfWork } from "../ports/index.js";
 import type { Env } from "./env.js";
 
@@ -22,6 +26,7 @@ export interface Container {
     health: HealthService;
     auth: AuthService;
     roster: RosterService;
+    schedule: ScheduleService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -34,6 +39,9 @@ export function buildContainer(env: Env): Container {
   const memberships = makePrismaMembershipRepo();
   const invites = makePrismaInviteRepo();
   const tournaments = makePrismaTournamentRepo();
+  const courts = makePrismaCourtRepo();
+  const matchups = makePrismaMatchupRepo();
+  const gamesRepo = makePrismaGameRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -60,6 +68,15 @@ export function buildContainer(env: Env): Container {
     generateCode: () => randomBytes(6).toString("hex"),
   });
 
+  const schedule = makeScheduleService({
+    tournaments,
+    teams,
+    matchups,
+    games: gamesRepo,
+    courts,
+    uow: unitOfWork,
+  });
+
   return {
     env,
     unitOfWork,
@@ -67,6 +84,7 @@ export function buildContainer(env: Env): Container {
       health: makeHealthService({ system }),
       auth,
       roster,
+      schedule,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };

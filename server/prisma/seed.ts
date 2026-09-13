@@ -17,6 +17,7 @@ async function main() {
       pairSize: 2,
       pairsPerLineup: 3,
       roundsPerMatchup: 2,
+      roundRobinCycles: 1,
       playoffQualifiers: 4,
       courtCount: 6,
       coinRule: { perWin: 100, perCloseLoss: 75, perLoss: 50 },

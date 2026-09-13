@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
+import { AdminSchedule } from "./AdminSchedule";
 
 interface AdminUser {
   id: string;
@@ -187,6 +188,8 @@ export function Admin() {
           </tbody>
         </table>
       </section>
+
+      <AdminSchedule />
     </div>
   );
 }

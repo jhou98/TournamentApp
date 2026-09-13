@@ -102,6 +102,15 @@ const currentTournament: TournamentRepo = {
   async getCurrent() {
     return { id: "t1", name: "Test" };
   },
+  async getCurrentDetail() {
+    throw new Error("not used");
+  },
+  async setStatus() {
+    throw new Error("not used");
+  },
+  async updateConfig() {
+    throw new Error("not used");
+  },
 };
 
 const fakeHasher: PasswordHasher = {

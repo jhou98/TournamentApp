@@ -4,6 +4,7 @@ import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { Profile } from "./pages/Profile";
 import { Admin } from "./pages/Admin";
+import { Schedule } from "./pages/Schedule";
 
 function Nav() {
   const { profile, logout } = useAuth();
@@ -11,6 +12,7 @@ function Nav() {
   return (
     <nav style={navStyle}>
       <Link to="/">Profile</Link>
+      <Link to="/schedule">Schedule</Link>
       {profile.role === "admin" && <Link to="/admin">Admin</Link>}
       <span style={{ marginLeft: "auto" }}>
         {profile.user.displayName} ({profile.role})
@@ -40,6 +42,14 @@ function Shell() {
           element={
             <RequireAuth>
               <Profile />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/schedule"
+          element={
+            <RequireAuth>
+              <Schedule />
             </RequireAuth>
           }
         />

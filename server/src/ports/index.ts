@@ -7,4 +7,21 @@ export { toPublicUser } from "./UserRepo.js";
 export type { TeamRepo, TeamRecord } from "./TeamRepo.js";
 export type { MembershipRepo, MembershipRecord, MembershipRole } from "./MembershipRepo.js";
 export type { InviteRepo, InviteRecord } from "./InviteRepo.js";
-export type { TournamentRepo, TournamentRef } from "./TournamentRepo.js";
+export type {
+  TournamentRepo,
+  TournamentRef,
+  TournamentDetail,
+  TournamentConfig,
+  TournamentStatus,
+} from "./TournamentRepo.js";
+export type { CourtRepo, CourtRecord } from "./CourtRepo.js";
+export type {
+  MatchupRepo,
+  MatchupRecord,
+  MatchupView,
+  MatchupGameView,
+  MatchupStage,
+  MatchupStatus,
+  NewMatchup,
+} from "./MatchupRepo.js";
+export type { GameRepo, GameRecord, GameStatus, NewGame } from "./GameRepo.js";

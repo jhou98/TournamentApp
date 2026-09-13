@@ -1,8 +1,14 @@
 # Friendsgiving Badminton Tournament — Design
 
-> **Status:** Living design doc. **No application code has been written yet.**
-> This is the artifact we iterate on before implementation. Owner: @jhou98.
-> Last updated: 2026-09-11.
+> **Status:** Living design doc. **Implementation in progress** — Phase 0 Part 0
+> (foundation + health), Part 1 (auth, roster, captains — US1–US3), and Part 2
+> (round-robin schedule generation + court assignment — US4–US5) have landed.
+> Owner: @jhou98. Last updated: 2026-09-12.
+>
+> **Changelog (2026-09-12):** Part 2 shipped — circle-method round-robin generation
+> from config, per-game court assignment, admin config editing, manual team swaps and
+> court reassignment. Added a `round_robin_cycles` config knob (default 1) so admins
+> can repeat the whole round robin (e.g. a double round robin) without unbalancing it.
 >
 > **Changelog:** Reworked P0/P1/P2 against the *Vibe Coding User Stories* doc, then
 > reconciled §3–§11 to match. The tournament is now **team → captain → pairs** with a
@@ -168,13 +174,14 @@ Stored on the `tournament` row (or a small `settings` table); editable while
 | `pair_size` | 2 | Players per pair (doubles = 2) |
 | `pairs_per_lineup` | 3 | Pairs each team fields per round ⇒ games per round |
 | `rounds_per_matchup` | 2 | Doubles rounds in one team matchup |
+| `round_robin_cycles` | 1 | How many times the whole round robin repeats (2 = double round robin) |
 | `playoff_qualifiers` | 4 | Top-N teams that advance to the seeded bracket |
 | `court_count` | 6 | Courts available for concurrent games |
 | `coin_rule` | JSON | Pluggable earning formula (D4) |
 | `streak_rule` | JSON | Streak-bonus config incl. **direction** (`loss` \| `win` \| `both`) + tiers — D16 |
 | `sudden_death_rule` | JSON | `{ first_to: 5, win_by: 2, cap: 7 }` |
 
-**Derived, never stored:** round-robin round count (from `team_count`), `games_per_matchup = rounds_per_matchup × pairs_per_lineup`, and the tie score that triggers sudden death (`games_per_matchup / 2`, when that split is possible).
+**Derived, never stored:** round-robin round count (`(even: team_count − 1 | odd: team_count) × round_robin_cycles`), `games_per_matchup = rounds_per_matchup × pairs_per_lineup`, and the tie score that triggers sudden death (`games_per_matchup / 2`, when that split is possible).
 
 ### Core tables (P0)
 
@@ -272,6 +279,14 @@ the streak bonus. Default numbers are data; the *interface* is what's fixed.
 - An admin can **directly promote/demote any user** (`PATCH /api/admin/users/:id` → `is_admin`) and
   can **mint `signup_invite` codes** (`grants_admin = true`) so people sign up already-admin.
 - Regular sign-up creates a normal user.
+
+> **Deferred — password management (future phase, D18).** Passwords are stored only as bcrypt
+> hashes and are **never viewable** by anyone (design invariant, not a gap). Two write flows are
+> intentionally **not built yet** and are planned for a later phase (fits P3 account settings):
+> **(a) self-service change password** — `POST /api/me/password` `{ currentPassword, newPassword }`,
+> verify current hash → re-hash → store, with a field on the Profile page; and **(b) admin password
+> reset** — `POST /api/admin/users/:id/password` to set a new password for a locked-out user (the
+> admin sets, never sees, the value). Both reuse the existing `PasswordHasher` port.
 
 **① Create teams (US1–US3)** — admin creates the `team_count` teams, adds player accounts, and
 **assigns each player to one team** (or auto-generates balanced teams). Admin marks **one captain per
@@ -426,6 +441,7 @@ between captains → lineups → randomized matchups → results → standings �
 | **D15** | Deployment architecture | **Option ① — stateless box + managed Neon Postgres**, coded for serverless portability (ports & adapters, §11). Serverless port is **compute-only** (Lambda + API Gateway) — no DB migration. |
 | **D16** | Streak bonus direction | **Both, configurable** via `streak_rule.direction` (`loss` \| `win` \| `both`). Losing-streak protection default from the source doc (+25/+50/+75 at 2/3/4+ losses); win-streak reward uses the same tiered shape. A streak resets when the run breaks. Amounts/tiers admin-tunable. |
 | **D17** | Bounty / mission completion | **Admin marks complete.** Commissioner/admin confirms a bounty or mission was earned, which writes the coin credit. (Auto-detection of common bounty conditions can be added later.) |
+| **D18** | Password management | **Deferred to a later phase (P3 account settings).** Passwords are bcrypt-hashed and never viewable. Self-service change password (`POST /api/me/password`) and admin reset (`POST /api/admin/users/:id/password`) are planned but intentionally not in Phase 0. See §5. |
 
 ### Open — deferred (P1, **not P0 blockers**)
 > These only bite once the economy lands; settle during implementation. P0 doesn't touch them.

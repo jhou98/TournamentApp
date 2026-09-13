@@ -19,6 +19,15 @@ const currentTournament: TournamentRepo = {
   async getCurrent() {
     return { id: TID, name: "Test" };
   },
+  async getCurrentDetail() {
+    throw new Error("not used");
+  },
+  async setStatus() {
+    throw new Error("not used");
+  },
+  async updateConfig() {
+    throw new Error("not used");
+  },
 };
 
 function fakeUsers(seed: PublicUser[]): UserRepo {

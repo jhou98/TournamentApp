@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { ValidationError } from "../../../../domain/errors.js";
 import type { RosterService } from "../../../../services/rosterService.js";
+import type { ScheduleService } from "../../../../services/scheduleService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { asyncHandler } from "../asyncHandler.js";
 import { requireParam } from "../params.js";
@@ -26,7 +27,32 @@ const assignMemberSchema = z.object({
 });
 const setCaptainSchema = z.object({ userId: z.string().min(1) });
 
-export function adminRouter(roster: RosterService, mw: AuthMiddleware): Router {
+const positiveInt = z.number().int().positive();
+const updateConfigSchema = z
+  .object({
+    teamCount: positiveInt,
+    teamSize: positiveInt,
+    pairSize: positiveInt,
+    pairsPerLineup: positiveInt,
+    roundsPerMatchup: positiveInt,
+    roundRobinCycles: positiveInt,
+    playoffQualifiers: positiveInt,
+    courtCount: positiveInt,
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "Provide at least one config field" });
+const editMatchupSchema = z.object({
+  teamAId: z.string().min(1),
+  teamBId: z.string().min(1),
+});
+const renameCourtSchema = z.object({ label: z.string().trim().min(1).max(60) });
+const reassignCourtSchema = z.object({ courtId: z.string().min(1) });
+
+export function adminRouter(
+  roster: RosterService,
+  schedule: ScheduleService,
+  mw: AuthMiddleware,
+): Router {
   const router = Router();
   router.use(mw.requireAdmin);
 
@@ -103,6 +129,71 @@ export function adminRouter(roster: RosterService, mw: AuthMiddleware): Router {
     asyncHandler(async (req, res) => {
       const { userId } = parse(setCaptainSchema, req.body);
       await roster.setCaptain(requireParam(req, "id"), userId);
+      res.status(204).end();
+    }),
+  );
+
+  // --- Tournament config, schedule & courts (Part 2) ----------------------
+
+  router.get(
+    "/tournament/config",
+    asyncHandler(async (_req, res) => {
+      res.json({ config: await schedule.getConfig() });
+    }),
+  );
+
+  router.patch(
+    "/tournament/config",
+    asyncHandler(async (req, res) => {
+      const patch = parse(updateConfigSchema, req.body);
+      res.json({ config: await schedule.updateConfig(patch) });
+    }),
+  );
+
+  router.post(
+    "/schedule/generate",
+    asyncHandler(async (_req, res) => {
+      res.status(201).json({ schedule: await schedule.generate() });
+    }),
+  );
+
+  router.post(
+    "/schedule/reset",
+    asyncHandler(async (_req, res) => {
+      await schedule.reset();
+      res.status(204).end();
+    }),
+  );
+
+  router.patch(
+    "/matchups/:id",
+    asyncHandler(async (req, res) => {
+      const { teamAId, teamBId } = parse(editMatchupSchema, req.body);
+      await schedule.editMatchup(requireParam(req, "id"), teamAId, teamBId);
+      res.status(204).end();
+    }),
+  );
+
+  router.get(
+    "/courts",
+    asyncHandler(async (_req, res) => {
+      res.json({ courts: await schedule.listCourts() });
+    }),
+  );
+
+  router.patch(
+    "/courts/:id",
+    asyncHandler(async (req, res) => {
+      const { label } = parse(renameCourtSchema, req.body);
+      res.json({ court: await schedule.renameCourt(requireParam(req, "id"), label) });
+    }),
+  );
+
+  router.patch(
+    "/games/:id",
+    asyncHandler(async (req, res) => {
+      const { courtId } = parse(reassignCourtSchema, req.body);
+      await schedule.reassignCourt(requireParam(req, "id"), courtId);
       res.status(204).end();
     }),
   );
