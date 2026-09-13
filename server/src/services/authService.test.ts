@@ -96,6 +96,9 @@ const noTeams: TeamRepo = {
   async listByTournament() {
     return [];
   },
+  async delete() {
+    throw new Error("not used");
+  },
 };
 
 const currentTournament: TournamentRepo = {

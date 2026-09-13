@@ -91,6 +91,9 @@ function buildService(stores: Stores): ScheduleService {
     async listByTournament(tournamentId) {
       return stores.teams.filter((t) => t.tournamentId === tournamentId);
     },
+    async delete(id) {
+      stores.teams = stores.teams.filter((t) => t.id !== id);
+    },
   };
 
   const courts: CourtRepo = {

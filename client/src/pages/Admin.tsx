@@ -92,6 +92,16 @@ export function Admin() {
         {teams.map((team) => (
           <div key={team.id} style={cardStyle}>
             <strong>{team.name}</strong> ({team.members.length})
+            <button
+              style={miniBtn}
+              onClick={() => {
+                if (window.confirm(`Remove team "${team.name}"? Its players will be unassigned.`)) {
+                  run(() => api(`/admin/teams/${team.id}`, { method: "DELETE" }));
+                }
+              }}
+            >
+              remove team
+            </button>
             <ul style={{ margin: "6px 0" }}>
               {team.members.map((m) => (
                 <li key={m.userId}>

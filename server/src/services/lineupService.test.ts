@@ -177,6 +177,9 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
     async listByTournament(tid) {
       return stores.teams.filter((t) => t.tournamentId === tid);
     },
+    async delete() {
+      throw new Error("not used");
+    },
   };
 
   const memberships: MembershipRepo = {

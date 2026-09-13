@@ -41,6 +41,7 @@ export interface RosterService {
   createInvite(input: { grantsAdmin: boolean; expiresAt: Date | null }, createdBy: string): Promise<InviteRecord>;
   listTeams(): Promise<TeamWithRoster[]>;
   createTeam(name: string): Promise<TeamWithRoster>;
+  removeTeam(teamId: string): Promise<void>;
   assignMember(userId: string, teamId: string, role?: MembershipRole): Promise<void>;
   removeMember(userId: string): Promise<void>;
   setCaptain(teamId: string, userId: string): Promise<void>;
@@ -105,6 +106,25 @@ export function makeRosterService(deps: RosterServiceDeps): RosterService {
       if (existing) throw new ConflictError("A team with that name already exists");
       const team = await deps.teams.create(tournamentId, name);
       return { id: team.id, name: team.name, members: [] };
+    },
+
+    async removeTeam(teamId) {
+      const tournament = await deps.tournaments.getCurrentDetail();
+      if (!tournament) throw new ValidationError("No tournament exists yet");
+      const team = await deps.teams.findById(teamId);
+      if (!team || team.tournamentId !== tournament.id) throw new NotFoundError("Team not found");
+      if (tournament.status !== "setup") {
+        throw new ConflictError("Teams can only be removed while the tournament is in setup");
+      }
+
+      await deps.uow.run(async () => {
+        // Detach the team's players first (memberships reference the team).
+        const members = await deps.memberships.listByTeam(teamId);
+        for (const m of members) {
+          await deps.memberships.removeByUserAndTournament(m.userId, tournament.id);
+        }
+        await deps.teams.delete(teamId);
+      });
     },
 
     async assignMember(userId, teamId, role = "member") {

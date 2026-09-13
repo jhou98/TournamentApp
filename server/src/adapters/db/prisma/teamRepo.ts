@@ -20,5 +20,8 @@ export function makePrismaTeamRepo(): TeamRepo {
         orderBy: { createdAt: "asc" },
       });
     },
+    async delete(id) {
+      await getDb().team.delete({ where: { id } });
+    },
   };
 }

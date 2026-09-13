@@ -7,7 +7,9 @@ import type {
   PublicUser,
   TeamRecord,
   TeamRepo,
+  TournamentDetail,
   TournamentRepo,
+  TournamentStatus,
   UnitOfWork,
   UserRepo,
 } from "../ports/index.js";
@@ -15,12 +17,30 @@ import type {
 const TID = "t1";
 
 const passthroughUow: UnitOfWork = { run: (work) => work() };
+
+let currentStatus: TournamentStatus = "setup";
+function tournamentDetail(): TournamentDetail {
+  return {
+    id: TID,
+    name: "Test",
+    status: currentStatus,
+    teamCount: 4,
+    teamSize: 6,
+    pairSize: 2,
+    pairsPerLineup: 3,
+    roundsPerMatchup: 2,
+    roundRobinCycles: 1,
+    playoffQualifiers: 4,
+    courtCount: 6,
+  };
+}
+
 const currentTournament: TournamentRepo = {
   async getCurrent() {
     return { id: TID, name: "Test" };
   },
   async getCurrentDetail() {
-    throw new Error("not used");
+    return tournamentDetail();
   },
   async setStatus() {
     throw new Error("not used");
@@ -70,6 +90,10 @@ function fakeTeams(seed: TeamRecord[]): TeamRepo {
     },
     async listByTournament(tournamentId) {
       return store.filter((t) => t.tournamentId === tournamentId);
+    },
+    async delete(id) {
+      const i = store.findIndex((t) => t.id === id);
+      if (i >= 0) store.splice(i, 1);
     },
   };
 }
@@ -174,6 +198,34 @@ describe("rosterService.createTeam", () => {
     const teams = fakeTeams([{ id: "team1", tournamentId: TID, name: "Alpha", createdAt: new Date() }]);
     const roster = build(users, teams, fakeMemberships());
     await expect(roster.createTeam("Alpha")).rejects.toBeInstanceOf(ConflictError);
+  });
+});
+
+describe("rosterService.removeTeam", () => {
+  it("deletes the team and unassigns its players while in setup", async () => {
+    currentStatus = "setup";
+    const users = fakeUsers([player("a"), player("b")]);
+    const teams = fakeTeams([
+      { id: "team1", tournamentId: TID, name: "Alpha", createdAt: new Date() },
+      { id: "team2", tournamentId: TID, name: "Beta", createdAt: new Date() },
+    ]);
+    const memberships = fakeMemberships();
+    const roster = build(users, teams, memberships);
+    await roster.assignMember("a", "team1");
+    await roster.assignMember("b", "team1");
+
+    await roster.removeTeam("team1");
+
+    expect(await teams.findById("team1")).toBeNull();
+    expect(memberships.store.filter((m) => m.teamId === "team1")).toHaveLength(0);
+  });
+
+  it("refuses to remove a team once out of setup", async () => {
+    currentStatus = "round_robin";
+    const teams = fakeTeams([{ id: "team1", tournamentId: TID, name: "Alpha", createdAt: new Date() }]);
+    const roster = build(fakeUsers([]), teams, fakeMemberships());
+    await expect(roster.removeTeam("team1")).rejects.toBeInstanceOf(ConflictError);
+    currentStatus = "setup";
   });
 });
 

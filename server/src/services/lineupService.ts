@@ -1,5 +1,5 @@
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../domain/errors.js";
-import { pairKey, validateLineup } from "../domain/lineup.js";
+import { describeLineupProblem, pairKey, validateLineup } from "../domain/lineup.js";
 import { assignPairs, type Rng } from "../domain/randomAssign.js";
 import type {
   CourtRepo,
@@ -364,7 +364,7 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
       );
       const usedPairKeys = otherRounds.flatMap((l) => l.pairs.map((p) => pairKey(p.playerIds)));
 
-      const errors = validateLineup(
+      const problems = validateLineup(
         { pairs: input.pairs },
         {
           pairsPerLineup: t.pairsPerLineup,
@@ -373,7 +373,14 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
           usedPairKeys,
         },
       );
-      if (errors.length > 0) throw new ValidationError(errors.join("; "));
+      if (problems.length > 0) {
+        // Resolve ids to names so the message never exposes a raw player id.
+        const nameOf = new Map(roster.players.map((p) => [p.id, p.displayName]));
+        const message = problems
+          .map((p) => describeLineupProblem(p, (id) => nameOf.get(id) ?? "Unknown player"))
+          .join("; ");
+        throw new ValidationError(message);
+      }
 
       return deps.uow.run(() =>
         deps.lineups.save({

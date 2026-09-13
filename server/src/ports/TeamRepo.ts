@@ -10,4 +10,5 @@ export interface TeamRepo {
   findById(id: string): Promise<TeamRecord | null>;
   findByName(tournamentId: string, name: string): Promise<TeamRecord | null>;
   listByTournament(tournamentId: string): Promise<TeamRecord[]>;
+  delete(id: string): Promise<void>;
 }

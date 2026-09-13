@@ -100,6 +100,14 @@ export function adminRouter(
     }),
   );
 
+  router.delete(
+    "/teams/:id",
+    asyncHandler(async (req, res) => {
+      await roster.removeTeam(requireParam(req, "id"));
+      res.status(204).end();
+    }),
+  );
+
   router.post(
     "/teams/auto-balance",
     asyncHandler(async (_req, res) => {
