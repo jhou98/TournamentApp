@@ -192,7 +192,7 @@ Stored on the `tournament` row (or a small `settings` table); editable while
 | `team_count` | 4 | Number of teams in the tournament |
 | `team_size` | 6 | Players per team (validate as a min/max range, not a hard equal) |
 | `pair_size` | 2 | Players per pair (doubles = 2) |
-| `pairs_per_lineup` | 3 | Pairs each team fields per round ⇒ games per round |
+| `pairs_per_lineup` | 3 | Pairs each team fields per **match** ⇒ games per match — UI: "Pairs / match" |
 | `rounds_per_matchup` | 2 | **Matches** (doubles rounds) in one team matchup — UI: "Matches / matchup" |
 | `round_robin_cycles` | 1 | How many times the whole round robin repeats (2 = double round robin) |
 | `playoff_qualifiers` | 4 | Top-N teams that advance to the seeded bracket |

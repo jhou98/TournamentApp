@@ -30,7 +30,7 @@ const CONFIG_FIELDS: { key: ConfigKey; label: string }[] = [
   { key: "teamCount", label: "Teams" },
   { key: "teamSize", label: "Players / team" },
   { key: "pairSize", label: "Players / pair" },
-  { key: "pairsPerLineup", label: "Pairs / round" },
+  { key: "pairsPerLineup", label: "Pairs / match" },
   { key: "roundsPerMatchup", label: "Matches / matchup" },
   { key: "roundRobinCycles", label: "Round-robin cycles" },
   { key: "playoffQualifiers", label: "Playoff qualifiers" },
