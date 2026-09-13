@@ -98,6 +98,9 @@ function freshStores(): Stores {
         courtId: `court${s + 1}`,
         homePairId: null,
         awayPairId: null,
+        scoreHome: null,
+        scoreAway: null,
+        winnerPairId: null,
         status: "awaiting_lineups",
       });
     }
@@ -157,6 +160,9 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
       return id === MID ? matchup : null;
     },
     async updateTeams() {
+      throw new Error("not used");
+    },
+    async setResult() {
       throw new Error("not used");
     },
     async deleteByTournament() {
@@ -303,7 +309,13 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
     async listByMatchup(matchupId) {
       return stores.games.filter((g) => g.matchupId === matchupId);
     },
+    async listByTournament() {
+      return [...stores.games];
+    },
     async setCourt() {
+      throw new Error("not used");
+    },
+    async setScore() {
       throw new Error("not used");
     },
     async assignPairs(assignments) {

@@ -76,6 +76,14 @@ export function makePrismaMatchupRepo(): MatchupRepo {
       });
     },
 
+    async setResult(id, result) {
+      return getDb().matchup.update({
+        where: { id },
+        data: { status: result.status, winnerTeamId: result.winnerTeamId },
+        select: RECORD_SELECT,
+      });
+    },
+
     async deleteByTournament(tournamentId) {
       await getDb().matchup.deleteMany({ where: { tournamentId } });
     },

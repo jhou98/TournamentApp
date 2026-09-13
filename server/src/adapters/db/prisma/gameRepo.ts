@@ -8,6 +8,9 @@ const RECORD_SELECT = {
   courtId: true,
   homePairId: true,
   awayPairId: true,
+  scoreHome: true,
+  scoreAway: true,
+  winnerPairId: true,
   status: true,
 } as const;
 
@@ -26,8 +29,30 @@ export function makePrismaGameRepo(): GameRepo {
         select: RECORD_SELECT,
       });
     },
+    async listByTournament(tournamentId) {
+      return getDb().game.findMany({
+        where: { matchup: { tournamentId } },
+        orderBy: [{ roundNo: "asc" }, { createdAt: "asc" }],
+        select: RECORD_SELECT,
+      });
+    },
     async setCourt(id, courtId) {
       return getDb().game.update({ where: { id }, data: { courtId }, select: RECORD_SELECT });
+    },
+    async setScore(id, score) {
+      return getDb().game.update({
+        where: { id },
+        data: {
+          scoreHome: score.scoreHome,
+          scoreAway: score.scoreAway,
+          winnerPairId: score.winnerPairId,
+          status: "final",
+          finalizedBy: score.finalizedBy,
+          finalizedAt: new Date(),
+          ...(score.courtId ? { courtId: score.courtId } : {}),
+        },
+        select: RECORD_SELECT,
+      });
     },
     async assignPairs(assignments) {
       const db = getDb();

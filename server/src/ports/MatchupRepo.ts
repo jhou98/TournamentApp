@@ -38,5 +38,10 @@ export interface MatchupRepo {
   listByTournament(tournamentId: string): Promise<MatchupView[]>;
   findById(id: string): Promise<MatchupRecord | null>;
   updateTeams(id: string, teamAId: string, teamBId: string): Promise<MatchupRecord>;
+  /** Set the derived matchup outcome after scores change (US9). */
+  setResult(
+    id: string,
+    result: { status: MatchupStatus; winnerTeamId: string | null },
+  ): Promise<MatchupRecord>;
   deleteByTournament(tournamentId: string): Promise<void>;
 }

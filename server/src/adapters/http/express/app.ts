@@ -11,6 +11,7 @@ import { meRouter } from "./routes/me.js";
 import { adminRouter } from "./routes/admin.js";
 import { scheduleRouter } from "./routes/schedule.js";
 import { matchupsRouter } from "./routes/matchups.js";
+import { resultsRouter } from "./routes/results.js";
 
 export function createApp(container: Container): Express {
   const app = express();
@@ -24,10 +25,16 @@ export function createApp(container: Container): Express {
   api.use("/me", meRouter(container.services.auth, container.authMiddleware));
   api.use(
     "/admin",
-    adminRouter(container.services.roster, container.services.schedule, container.authMiddleware),
+    adminRouter(
+      container.services.roster,
+      container.services.schedule,
+      container.services.results,
+      container.authMiddleware,
+    ),
   );
   api.use("/schedule", scheduleRouter(container.services.schedule, container.authMiddleware));
   api.use("/matchups", matchupsRouter(container.services.lineups, container.authMiddleware));
+  api.use(resultsRouter(container.services.results, container.authMiddleware));
   app.use("/api", api);
 
   // Serve the built SPA in production, with history fallback for client routes.

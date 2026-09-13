@@ -158,6 +158,12 @@ function buildService(stores: Stores): ScheduleService {
       m.teamBId = teamBId;
       return m;
     },
+    async setResult(id, result) {
+      const m = stores.matchups.find((x) => x.id === id)!;
+      m.status = result.status;
+      m.winnerTeamId = result.winnerTeamId;
+      return m;
+    },
     async deleteByTournament(tournamentId) {
       stores.matchups = stores.matchups.filter((m) => m.tournamentId !== tournamentId);
     },
@@ -174,6 +180,9 @@ function buildService(stores: Stores): ScheduleService {
           status: "awaiting_lineups",
           homePairId: null,
           awayPairId: null,
+          scoreHome: null,
+          scoreAway: null,
+          winnerPairId: null,
           ...g,
         });
       }
@@ -184,9 +193,21 @@ function buildService(stores: Stores): ScheduleService {
     async listByMatchup(matchupId) {
       return stores.games.filter((g) => g.matchupId === matchupId);
     },
+    async listByTournament(tournamentId) {
+      return stores.games.filter((g) => matchupTournament(g.matchupId) === tournamentId);
+    },
     async setCourt(id, courtId) {
       const g = stores.games.find((x) => x.id === id)!;
       g.courtId = courtId;
+      return g;
+    },
+    async setScore(id, score) {
+      const g = stores.games.find((x) => x.id === id)!;
+      g.scoreHome = score.scoreHome;
+      g.scoreAway = score.scoreAway;
+      g.winnerPairId = score.winnerPairId;
+      g.status = "final";
+      if (score.courtId) g.courtId = score.courtId;
       return g;
     },
     async assignPairs(assignments) {
