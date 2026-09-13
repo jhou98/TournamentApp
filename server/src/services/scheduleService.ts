@@ -5,6 +5,7 @@ import type {
   CourtRecord,
   CourtRepo,
   GameRepo,
+  LineupRepo,
   MatchupRepo,
   NewGame,
   NewMatchup,
@@ -53,6 +54,7 @@ export interface ScheduleServiceDeps {
   matchups: MatchupRepo;
   games: GameRepo;
   courts: CourtRepo;
+  lineups: LineupRepo;
   uow: UnitOfWork;
 }
 
@@ -240,8 +242,10 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
       });
 
       await deps.uow.run(async () => {
-        // Clean slate in case a prior partial schedule lingers.
+        // Clean slate in case a prior partial schedule lingers (order matters:
+        // games and lineups reference matchups).
         await deps.games.deleteByTournament(t.id);
+        await deps.lineups.deleteByTournament(t.id);
         await deps.matchups.deleteByTournament(t.id);
 
         const newMatchups: NewMatchup[] = rrMatchups.map((m) => ({
@@ -276,6 +280,7 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
       }
       await deps.uow.run(async () => {
         await deps.games.deleteByTournament(t.id);
+        await deps.lineups.deleteByTournament(t.id);
         await deps.matchups.deleteByTournament(t.id);
         await deps.tournaments.setStatus(t.id, "setup");
       });

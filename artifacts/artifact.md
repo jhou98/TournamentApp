@@ -1,11 +1,22 @@
 # Friendsgiving Badminton Tournament — Design
 
 > **Status:** Living design doc. **Implementation in progress** — Phase 0 Part 0
-> (foundation + health), Part 1 (auth, roster, captains — US1–US3), and Part 2
-> (round-robin schedule generation + court assignment — US4–US5) have landed.
+> (foundation + health), Part 1 (auth, roster, captains — US1–US3), Part 2
+> (round-robin schedule generation + court assignment — US4–US5), and Part 3
+> (captain lineups, validation, random pair assignment — US6–US8) have landed.
 > Owner: @jhou98. Last updated: 2026-09-12.
 >
-> **Changelog (2026-09-12):** Part 2 shipped — circle-method round-robin generation
+> **Changelog (2026-09-12) — Part 3:** US6–US8 shipped. Captains (or admins) submit
+> `pairs_per_lineup` doubles pairs per round from their roster; validation enforces the
+> right pair count, on-roster players, no player in two pairs a round, no duplicate
+> pairing within a matchup (US7). Submit → lock; once **both** sides lock a round the
+> system **randomly matches** home vs away pairs (Fisher–Yates, injectable RNG) and fills
+> the pre-created game shells → `assigned` (US8). Opponent pairs stay hidden until both
+> lock (reveal). Admins can **unlock/override**, which clears a non-final round's random
+> assignment so it can be re-picked and re-matched. New `/api/matchups*` routes + a
+> captain **Lineups** page. No schema change (Part 2 already modeled lineup/pair/game).
+>
+> **Changelog (2026-09-12) — Part 2:** circle-method round-robin generation
 > from config, per-game court assignment, admin config editing, manual team swaps and
 > court reassignment. Added a `round_robin_cycles` config knob (default 1) so admins
 > can repeat the whole round robin (e.g. a double round robin) without unbalancing it.

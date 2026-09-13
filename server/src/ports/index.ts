@@ -24,4 +24,18 @@ export type {
   MatchupStatus,
   NewMatchup,
 } from "./MatchupRepo.js";
-export type { GameRepo, GameRecord, GameStatus, NewGame } from "./GameRepo.js";
+export type {
+  GameRepo,
+  GameRecord,
+  GameStatus,
+  NewGame,
+  PairAssignmentInput,
+} from "./GameRepo.js";
+export type {
+  LineupRepo,
+  LineupRecord,
+  LineupWithPairs,
+  PairRecord,
+  NewPair,
+  SaveLineupInput,
+} from "./LineupRepo.js";

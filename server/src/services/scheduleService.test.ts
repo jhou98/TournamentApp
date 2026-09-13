@@ -6,6 +6,8 @@ import type {
   CourtRepo,
   GameRecord,
   GameRepo,
+  LineupRepo,
+  LineupWithPairs,
   MatchupRecord,
   MatchupRepo,
   TeamRecord,
@@ -24,6 +26,7 @@ interface Stores {
   courts: CourtRecord[];
   matchups: MatchupRecord[];
   games: GameRecord[];
+  lineups: LineupWithPairs[];
 }
 
 function defaultDetail(overrides: Partial<TournamentDetail> = {}): TournamentDetail {
@@ -163,16 +166,42 @@ function buildService(stores: Stores): ScheduleService {
   const games: GameRepo = {
     async createMany(news) {
       for (const g of news) {
-        stores.games.push({ id: `game${++gameSeq}`, status: "awaiting_lineups", ...g });
+        stores.games.push({
+          id: `game${++gameSeq}`,
+          status: "awaiting_lineups",
+          homePairId: null,
+          awayPairId: null,
+          ...g,
+        });
       }
     },
     async findById(id) {
       return stores.games.find((g) => g.id === id) ?? null;
     },
+    async listByMatchup(matchupId) {
+      return stores.games.filter((g) => g.matchupId === matchupId);
+    },
     async setCourt(id, courtId) {
       const g = stores.games.find((x) => x.id === id)!;
       g.courtId = courtId;
       return g;
+    },
+    async assignPairs(assignments) {
+      for (const a of assignments) {
+        const g = stores.games.find((x) => x.id === a.gameId)!;
+        g.homePairId = a.homePairId;
+        g.awayPairId = a.awayPairId;
+        g.status = "assigned";
+      }
+    },
+    async clearAssignmentsForRound(matchupId, roundNo) {
+      for (const g of stores.games) {
+        if (g.matchupId === matchupId && g.roundNo === roundNo && g.status !== "final") {
+          g.homePairId = null;
+          g.awayPairId = null;
+          g.status = "awaiting_lineups";
+        }
+      }
     },
     async countByStatus(tournamentId, status) {
       return stores.games.filter(
@@ -184,7 +213,46 @@ function buildService(stores: Stores): ScheduleService {
     },
   };
 
-  return makeScheduleService({ tournaments, teams, matchups, games, courts, uow: passthroughUow });
+  const lineups: LineupRepo = {
+    async findByRound(matchupId, teamId, roundNo) {
+      return (
+        stores.lineups.find(
+          (l) => l.matchupId === matchupId && l.teamId === teamId && l.roundNo === roundNo,
+        ) ?? null
+      );
+    },
+    async listByMatchup(matchupId) {
+      return stores.lineups.filter((l) => l.matchupId === matchupId);
+    },
+    async listByTeam(teamId) {
+      return stores.lineups.filter((l) => l.teamId === teamId);
+    },
+    async findById(id) {
+      return stores.lineups.find((l) => l.id === id) ?? null;
+    },
+    async save() {
+      throw new Error("not used");
+    },
+    async setLocked() {
+      throw new Error("not used");
+    },
+    async deleteByTournament(tournamentId) {
+      const ids = new Set(
+        stores.matchups.filter((m) => m.tournamentId === tournamentId).map((m) => m.id),
+      );
+      stores.lineups = stores.lineups.filter((l) => !ids.has(l.matchupId));
+    },
+  };
+
+  return makeScheduleService({
+    tournaments,
+    teams,
+    matchups,
+    games,
+    courts,
+    lineups,
+    uow: passthroughUow,
+  });
 }
 
 function freshStores(detail?: Partial<TournamentDetail>, teamCount = 4): Stores {
@@ -195,6 +263,7 @@ function freshStores(detail?: Partial<TournamentDetail>, teamCount = 4): Stores 
     courts: [],
     matchups: [],
     games: [],
+    lineups: [],
   };
 }
 

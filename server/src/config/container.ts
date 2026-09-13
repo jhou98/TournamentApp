@@ -9,6 +9,7 @@ import { makePrismaTournamentRepo } from "../adapters/db/prisma/tournamentRepo.j
 import { makePrismaCourtRepo } from "../adapters/db/prisma/courtRepo.js";
 import { makePrismaMatchupRepo } from "../adapters/db/prisma/matchupRepo.js";
 import { makePrismaGameRepo } from "../adapters/db/prisma/gameRepo.js";
+import { makePrismaLineupRepo } from "../adapters/db/prisma/lineupRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -16,6 +17,7 @@ import { makeHealthService, type HealthService } from "../services/healthService
 import { makeAuthService, type AuthService } from "../services/authService.js";
 import { makeRosterService, type RosterService } from "../services/rosterService.js";
 import { makeScheduleService, type ScheduleService } from "../services/scheduleService.js";
+import { makeLineupService, type LineupService } from "../services/lineupService.js";
 import type { UnitOfWork } from "../ports/index.js";
 import type { Env } from "./env.js";
 
@@ -27,6 +29,7 @@ export interface Container {
     auth: AuthService;
     roster: RosterService;
     schedule: ScheduleService;
+    lineups: LineupService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -42,6 +45,7 @@ export function buildContainer(env: Env): Container {
   const courts = makePrismaCourtRepo();
   const matchups = makePrismaMatchupRepo();
   const gamesRepo = makePrismaGameRepo();
+  const lineups = makePrismaLineupRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -74,6 +78,19 @@ export function buildContainer(env: Env): Container {
     matchups,
     games: gamesRepo,
     courts,
+    lineups,
+    uow: unitOfWork,
+  });
+
+  const lineupService = makeLineupService({
+    tournaments,
+    matchups,
+    teams,
+    memberships,
+    users,
+    courts,
+    lineups,
+    games: gamesRepo,
     uow: unitOfWork,
   });
 
@@ -85,6 +102,7 @@ export function buildContainer(env: Env): Container {
       auth,
       roster,
       schedule,
+      lineups: lineupService,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };
