@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import type { ResultMatchupView, ResultsView, ScheduleMatchupView, ScheduleView, StandingsView } from "../lib/types";
+import type {
+  CoinSummaryView,
+  ResultMatchupView,
+  ResultsView,
+  ScheduleMatchupView,
+  ScheduleView,
+  StandingsView,
+} from "../lib/types";
 import { stageLabel } from "../lib/types";
 import { Icon, Shuttle } from "../components/Icon";
 import { Alert, Button, Card, EmptyState, Loading, PageHeader, Pill, StatCard, TeamChip, TeamMark } from "../components/ui";
@@ -13,6 +20,7 @@ export function Home() {
   const [schedule, setSchedule] = useState<ScheduleView | null>(null);
   const [standings, setStandings] = useState<StandingsView | null>(null);
   const [results, setResults] = useState<ResultsView | null>(null);
+  const [coins, setCoins] = useState<CoinSummaryView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,6 +32,10 @@ export function Home() {
         setResults(r);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
+    // Coins load independently so an economy hiccup never blanks the dashboard.
+    api<CoinSummaryView>("/me/coins")
+      .then(setCoins)
+      .catch(() => setCoins(null));
   }, [activeTournamentId]);
 
   if (!profile) return null;
@@ -150,6 +162,28 @@ export function Home() {
         </Card>
 
         <div className="space-y-5">
+          {/* my coins */}
+          <Card
+            title="My coins"
+            action={
+              <Link to="/profile" className="link text-[13px]">
+                History
+              </Link>
+            }
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-ctl bg-brand-soft text-brand">
+                <Icon name="coins" size={22} />
+              </span>
+              <div>
+                <div className="text-2xl font-extrabold tabular-nums text-brand">
+                  {coins ? coins.balance : "—"}
+                </div>
+                <div className="text-xs text-ink-muted">Earned in {tournament.name}</div>
+              </div>
+            </div>
+          </Card>
+
           {/* my team */}
           <Card title="My team">
             {profile.team ? (

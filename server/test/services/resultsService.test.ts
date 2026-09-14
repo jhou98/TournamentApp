@@ -316,6 +316,9 @@ function buildService(stores: Stores): ResultsService {
       // No-op in results-service tests — the ledger recompute itself is
       // covered by economyService.test.ts.
     },
+    async getCoinSummary() {
+      return { balance: 0, transactions: [] };
+    },
   };
 
   return makeResultsService({

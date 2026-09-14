@@ -260,6 +260,9 @@ function buildService(stores: Stores): SuddenDeathService {
     async recomputeTournamentLedger(tournamentId: string) {
       stores.recomputes.push(tournamentId);
     },
+    async getCoinSummary() {
+      return { balance: 0, transactions: [] };
+    },
   };
 
   return makeSuddenDeathService({

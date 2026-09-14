@@ -25,7 +25,12 @@ export function createApp(container: Container): Express {
   api.use("/auth", authRouter(container.services.auth));
   api.use(
     "/me",
-    meRouter(container.services.auth, container.services.tournaments, container.authMiddleware),
+    meRouter(
+      container.services.auth,
+      container.services.tournaments,
+      container.services.economy,
+      container.authMiddleware,
+    ),
   );
   api.use(
     "/tournaments",

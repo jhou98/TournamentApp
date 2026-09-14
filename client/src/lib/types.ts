@@ -111,7 +111,60 @@ export interface ResultsView {
   matchups: ResultMatchupView[];
 }
 
+/* --- GET /api/me/coins --------------------------------------------------- */
+
+export type CoinReason =
+  | "match_result"
+  | "streak_bonus"
+  | "mission"
+  | "bounty"
+  | "event"
+  | "purchase"
+  | "admin_adjust";
+
+export interface CoinMatchDetail {
+  matchupId: string;
+  stage: Stage | string;
+  roundIndex: number | null;
+  roundNo: number;
+  opponentTeamName: string;
+  scoreFor: number;
+  scoreAgainst: number;
+  won: boolean;
+}
+
+export interface CoinTransactionView {
+  id: string;
+  delta: number;
+  reason: CoinReason;
+  note: string | null;
+  gameId: string | null;
+  createdAt: string;
+  /** Match context for match_result rows; null for other reasons. */
+  match: CoinMatchDetail | null;
+}
+
+export interface CoinSummaryView {
+  balance: number;
+  transactions: CoinTransactionView[];
+}
+
 /* --- helpers ------------------------------------------------------------- */
+
+const COIN_REASON_LABEL: Record<CoinReason, string> = {
+  match_result: "Match result",
+  streak_bonus: "Streak bonus",
+  mission: "Mission",
+  bounty: "Bounty",
+  event: "Event",
+  purchase: "Purchase",
+  admin_adjust: "Admin adjustment",
+};
+
+export function coinReasonLabel(reason: CoinReason): string {
+  return COIN_REASON_LABEL[reason] ?? reason;
+}
+
 
 export function stageLabel(stage: string, roundIndex?: number | null): string {
   if (stage === "semifinal") return "Semifinal";

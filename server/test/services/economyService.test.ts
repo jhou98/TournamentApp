@@ -3,6 +3,7 @@ import { makeEconomyService, type EconomyService } from "../../src/services/econ
 import { DEFAULT_COIN_RULE, DEFAULT_STREAK_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   CoinLedgerRepo,
+  CoinTransactionRecord,
   GameRecord,
   GameRepo,
   LineupRepo,
@@ -46,6 +47,8 @@ interface Stores {
   matchups: MatchupRecord[];
   createdRows: NewCoinTransaction[][];
   deletedFor: string[];
+  /** Pre-seeded ledger reads keyed by `${tournamentId}:${userId}`. */
+  ledgerByUser: Record<string, CoinTransactionRecord[]>;
 }
 
 function freshStores(): Stores {
@@ -119,7 +122,7 @@ function freshStores(): Stores {
     },
   ];
 
-  return { tournament: detail(), games, lineups, matchups, createdRows: [], deletedFor: [] };
+  return { tournament: detail(), games, lineups, matchups, createdRows: [], deletedFor: [], ledgerByUser: {} };
 }
 
 function buildService(stores: Stores): EconomyService {
@@ -232,11 +235,12 @@ function buildService(stores: Stores): EconomyService {
     async deleteDerivedByTournament(tournamentId) {
       stores.deletedFor.push(tournamentId);
     },
-    async sumByUser() {
-      return 0;
+    async sumByUser(tournamentId, userId) {
+      const rows = stores.ledgerByUser[`${tournamentId}:${userId}`] ?? [];
+      return rows.reduce((sum, r) => sum + r.delta, 0);
     },
-    async listByUser() {
-      return [];
+    async listByUser(tournamentId, userId) {
+      return (stores.ledgerByUser[`${tournamentId}:${userId}`] ?? []).map((r) => ({ ...r }));
     },
     async sumByTournamentGroupedByUser() {
       return [];
@@ -369,5 +373,105 @@ describe("economyService.recomputeTournamentLedger", () => {
 
     // The winning team never had a losing run -> no streak bonuses for them.
     expect(rows.some((r) => r.reason === "streak_bonus" && (r.userId === "a1" || r.userId === "a2"))).toBe(false);
+  });
+});
+
+describe("economyService.getCoinSummary", () => {
+  let stores: Stores;
+  let service: EconomyService;
+
+  beforeEach(() => {
+    stores = freshStores();
+    service = buildService(stores);
+  });
+
+  function txn(over: Partial<CoinTransactionRecord>): CoinTransactionRecord {
+    return {
+      id: "tx1",
+      tournamentId: TID,
+      userId: "a1",
+      delta: 100,
+      reason: "match_result",
+      gameId: null,
+      bountyId: null,
+      missionId: null,
+      purchaseId: null,
+      note: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      ...over,
+    };
+  }
+
+  it("returns a zero balance and no transactions for a player with no ledger entries", async () => {
+    const summary = await service.getCoinSummary(TID, "nobody");
+    expect(summary).toEqual({ balance: 0, transactions: [] });
+  });
+
+  it("sums the balance and maps rows to the client shape (createdAt as ISO)", async () => {
+    stores.ledgerByUser[`${TID}:a1`] = [
+      txn({ id: "tx2", delta: 25, reason: "streak_bonus", note: "Loss streak x2", createdAt: new Date("2026-01-02T00:00:00.000Z") }),
+      txn({ id: "tx1", delta: 100, reason: "match_result", gameId: "g1" }),
+    ];
+
+    const summary = await service.getCoinSummary(TID, "a1");
+
+    expect(summary.balance).toBe(125);
+    // Non-match rows carry a null match; the match_result row is enriched below.
+    const streak = summary.transactions.find((t) => t.id === "tx2")!;
+    expect(streak).toEqual({
+      id: "tx2",
+      delta: 25,
+      reason: "streak_bonus",
+      note: "Loss streak x2",
+      gameId: null,
+      createdAt: "2026-01-02T00:00:00.000Z",
+      match: null,
+    });
+  });
+
+  it("enriches a match_result row with the game/matchup, oriented to the player", async () => {
+    // g1 in the fixture: a1/a2 (home pair pa1) beat b1/b2 21–10 in round robin round 1.
+    stores.ledgerByUser[`${TID}:a1`] = [txn({ id: "tx1", delta: 100, reason: "match_result", gameId: "g1" })];
+
+    const [tx] = (await service.getCoinSummary(TID, "a1")).transactions;
+    expect(tx!.match).toEqual({
+      matchupId: MID,
+      stage: "round_robin",
+      roundIndex: 1,
+      roundNo: 1,
+      opponentTeamName: "Bravo",
+      scoreFor: 21,
+      scoreAgainst: 10,
+      won: true,
+    });
+  });
+
+  it("orients the score from the losing player's side", async () => {
+    // Same g1, but from b1's perspective (away pair pb1): lost 10–21 vs Alpha.
+    stores.ledgerByUser[`${TID}:b1`] = [txn({ id: "tx3", userId: "b1", delta: 50, reason: "match_result", gameId: "g1" })];
+
+    const [tx] = (await service.getCoinSummary(TID, "b1")).transactions;
+    expect(tx!.match).toMatchObject({
+      opponentTeamName: "Alpha",
+      scoreFor: 10,
+      scoreAgainst: 21,
+      won: false,
+    });
+  });
+
+  it("leaves match null when the player's side can't be resolved", async () => {
+    // A match_result row for a user who is on neither pair of the game.
+    stores.ledgerByUser[`${TID}:ghost`] = [txn({ id: "tx4", userId: "ghost", delta: 50, reason: "match_result", gameId: "g1" })];
+
+    const [tx] = (await service.getCoinSummary(TID, "ghost")).transactions;
+    expect(tx!.match).toBeNull();
+  });
+
+  it("scopes the balance to the tournament (no carry-over across tournaments)", async () => {
+    stores.ledgerByUser[`${TID}:a1`] = [txn({ delta: 100 })];
+    stores.ledgerByUser[`other:a1`] = [txn({ tournamentId: "other", delta: 999 })];
+
+    const summary = await service.getCoinSummary(TID, "a1");
+    expect(summary.balance).toBe(100);
   });
 });
