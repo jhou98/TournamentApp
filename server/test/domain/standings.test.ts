@@ -90,7 +90,6 @@ describe("computeStandings", () => {
     const a = byId.get("A")!;
     expect(a.matchupsWon).toBe(1);
     expect(a.matchupsLost).toBe(0);
-    expect(a.points).toBe(3);
     expect(a.gamesWon).toBe(3); // 2 in m1 + 1 in m2 (as away)
     expect(a.gamesLost).toBe(0);
     expect(a.pointsFor).toBe(21 + 21 + 21);
@@ -106,27 +105,7 @@ describe("computeStandings", () => {
     expect(c.gamesLost).toBe(1); // still lost the one final game
   });
 
-  it("credits a tie to both teams and awards a point each", () => {
-    const twoTeams = [
-      { id: "A", name: "Alpha" },
-      { id: "B", name: "Bravo" },
-    ];
-    // Completed matchup with no winner = a draw (1–1 game split).
-    const matchups: M[] = [
-      { id: "m1", teamAId: "A", teamBId: "B", winnerTeamId: null, status: "final" },
-    ];
-    const games = [game("m1", 1, 21, 10), game("m1", 2, 10, 21)];
-    const rows = computeStandings(twoTeams, matchups, games);
-    for (const r of rows) {
-      expect(r.matchupsTied).toBe(1);
-      expect(r.matchupsPlayed).toBe(1);
-      expect(r.matchupsWon).toBe(0);
-      expect(r.matchupsLost).toBe(0);
-      expect(r.points).toBe(1);
-    }
-  });
-
-  it("ranks by points (W=3, T=1), then game diff, then point diff, then name", () => {
+  it("ranks by matchups won, then game diff, then point diff, then name", () => {
     const matchups: M[] = [
       { id: "m1", teamAId: "A", teamBId: "B", winnerTeamId: "A", status: "final" },
       { id: "m2", teamAId: "B", teamBId: "C", winnerTeamId: "B", status: "final" },
@@ -134,40 +113,18 @@ describe("computeStandings", () => {
     ];
     const games = [game("m1", 1, 21, 5), game("m2", 1, 21, 5), game("m3", 1, 21, 5)];
     const rows = computeStandings(teams, matchups, games);
-    // A: 2 wins (6), B: 1 win (3), C: 0 (0)
+    // A: 2 wins, B: 1 win, C: 0 wins
     expect(rows.map((r) => r.teamId)).toEqual(["A", "B", "C"]);
-    expect(rows.map((r) => r.points)).toEqual([6, 3, 0]);
+    expect(rows.map((r) => r.matchupsWon)).toEqual([2, 1, 0]);
     expect(rows.map((r) => r.rank)).toEqual([1, 2, 3]);
   });
 
-  it("ranks an undefeated-with-ties team above an equal-win team with a loss", () => {
-    // A: beat B, tied C -> 1W 1T 0L = 4 pts (undefeated).
-    // B: lost to A, beat C -> 1W 0T 1L = 3 pts.
-    // C: tied A, lost to B -> 0W 1T 1L = 1 pt.
-    const matchups: M[] = [
-      { id: "m1", teamAId: "A", teamBId: "B", winnerTeamId: "A", status: "final" },
-      { id: "m2", teamAId: "A", teamBId: "C", winnerTeamId: null, status: "final" }, // draw
-      { id: "m3", teamAId: "B", teamBId: "C", winnerTeamId: "B", status: "final" },
-    ];
-    const games = [
-      game("m1", 1, 21, 5),
-      game("m2", 1, 21, 5), // A wins game 1
-      game("m2", 2, 5, 21), // C wins game 2 -> 1–1 draw
-      game("m3", 1, 21, 5),
-    ];
-    const rows = computeStandings(teams, matchups, games);
-    expect(rows.map((r) => r.teamId)).toEqual(["A", "B", "C"]);
-    expect(rows.map((r) => r.points)).toEqual([4, 3, 1]);
-    expect(rows[0]!.matchupsTied).toBe(1);
-    expect(rows[0]!.matchupsLost).toBe(0);
-  });
-
-  it("breaks an equal points total by game differential", () => {
+  it("breaks an equal win total by game differential", () => {
     const twoTeams = [
       { id: "A", name: "Alpha" },
       { id: "B", name: "Bravo" },
     ];
-    // Both won one matchup (3 pts each), but A won its games more decisively.
+    // Both won one matchup, but A won its games more decisively.
     const matchups: M[] = [
       { id: "m1", teamAId: "A", teamBId: "B", winnerTeamId: "A", status: "final" },
       { id: "m2", teamAId: "A", teamBId: "B", winnerTeamId: "B", status: "final" },

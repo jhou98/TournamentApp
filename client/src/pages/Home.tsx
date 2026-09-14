@@ -171,7 +171,7 @@ export function Home() {
                 {myRow && (
                   <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
                     <Stat label="Rank" value={`#${myRow.rank}`} />
-                    <Stat label="W-L-T" value={`${myRow.matchupsWon}-${myRow.matchupsLost}-${myRow.matchupsTied}`} />
+                    <Stat label="W-L" value={`${myRow.matchupsWon}-${myRow.matchupsLost}`} />
                     <Stat label="Games" value={`${myRow.gamesWon}-${myRow.gamesLost}`} />
                   </dl>
                 )}
@@ -210,9 +210,8 @@ export function Home() {
                       <TeamChip name={r.teamName} size={22} />
                     </span>
                     <span className="ml-auto tabular-nums text-ink-muted">
-                      {r.matchupsWon}-{r.matchupsLost}-{r.matchupsTied}
+                      {r.matchupsWon}-{r.matchupsLost}
                     </span>
-                    <Pill tone="brand">{r.points} pts</Pill>
                   </li>
                 ))}
               </ol>
@@ -249,7 +248,7 @@ function ResultRow({ m }: { m: ResultMatchupView }) {
       </span>
       <span className="hidden shrink-0 items-center gap-2 sm:flex">
         <span className="text-xs text-ink-faint">{stageLabel(m.stage, m.roundIndex)}</span>
-        {m.tied && !m.winnerTeamId ? <Pill tone="info">Tie</Pill> : <Pill tone="success" icon="check">Completed</Pill>}
+        <Pill tone="success" icon="check">Completed</Pill>
       </span>
       <Link to="/tournament/results" className="text-ink-faint hover:text-ink" aria-label="Open results">
         <Icon name="chevronRight" size={16} />

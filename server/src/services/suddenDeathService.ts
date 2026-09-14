@@ -31,7 +31,7 @@ export interface SDTeamView {
 }
 
 export interface SuddenDeathState {
-  /** Matchup is a tied playoff game awaiting a 1v1 decision. */
+  /** Matchup is tied on game wins, awaiting a 1v1 sudden-death decision. */
   active: boolean;
   teamA: SDTeamView;
   teamB: SDTeamView;
@@ -88,9 +88,8 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
     return players;
   }
 
-  /** A playoff matchup whose games are all final but tied on game wins. */
-  async function isTiedPlayoff(matchup: MatchupRecord, t: TournamentDetail): Promise<boolean> {
-    if (matchup.stage !== "semifinal" && matchup.stage !== "final") return false;
+  /** A matchup (round robin or playoffs) whose games are all final but tied on game wins. */
+  async function isTiedMatchup(matchup: MatchupRecord, t: TournamentDetail): Promise<boolean> {
     const games = await deps.games.listByMatchup(matchup.id);
     const result = computeMatchupResult(games as GameResultInput[], t.roundsPerMatchup * t.pairsPerLineup);
     return result.tied;
@@ -125,7 +124,7 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
         id ? { id, displayName: nameOf.get(id) ?? id } : null;
 
       const decided = !!matchup.winnerTeamId;
-      const active = (await isTiedPlayoff(matchup, t)) && !decided;
+      const active = (await isTiedMatchup(matchup, t)) && !decided;
 
       const result =
         sd && sd.scoreA !== null && sd.scoreB !== null && sd.winnerTeamId
@@ -150,8 +149,8 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
       const matchup = await requireMatchup(matchupId, t.id);
       await authorizeForTeam(user, matchup, teamId, t.id);
 
-      if (!(await isTiedPlayoff(matchup, t))) {
-        throw new ConflictError("Sudden death applies only to a tied playoff matchup");
+      if (!(await isTiedMatchup(matchup, t))) {
+        throw new ConflictError("Sudden death applies only to a tied matchup");
       }
       if (matchup.winnerTeamId) {
         throw new ConflictError("The sudden-death result is already recorded");
@@ -181,13 +180,12 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
       const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
 
-      if (!(await isTiedPlayoff(matchup, t))) {
-        throw new ConflictError("Sudden death applies only to a tied playoff matchup");
-      }
-      if (matchup.winnerTeamId) {
-        throw new ConflictError("The sudden-death result is already recorded");
+      if (!(await isTiedMatchup(matchup, t))) {
+        throw new ConflictError("Sudden death applies only to a tied matchup");
       }
 
+      // Admins may re-enter this to correct a mistake — no "already recorded"
+      // guard here (unlike chooseRep, which locks reps once decided).
       const sd = await deps.suddenDeath.findByMatchup(matchupId);
       if (!sd?.teamARep || !sd?.teamBRep) {
         throw new ConflictError("Both teams must choose a representative first");

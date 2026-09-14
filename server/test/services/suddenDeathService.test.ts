@@ -53,14 +53,14 @@ interface Stores {
   sd: SuddenDeathRecord | null;
 }
 
-/** A tied final: game 1 home wins, game 2 away wins (1–1). */
-function tiedFinal(): Stores {
+/** A tied matchup: game 1 home wins, game 2 away wins (1–1). Defaults to a final. */
+function tiedFinal(stage: MatchupRecord["stage"] = "final"): Stores {
   const matchup: MatchupRecord = {
     id: MID,
     tournamentId: TID,
-    stage: "final",
-    roundIndex: null,
-    bracketSlot: "F",
+    stage,
+    roundIndex: stage === "round_robin" ? 1 : null,
+    bracketSlot: stage === "round_robin" ? null : "F",
     teamAId: TA,
     teamBId: TB,
     status: "in_progress",
@@ -286,6 +286,13 @@ describe("suddenDeathService.getState", () => {
     expect(state.teamA.rep).toBeNull();
     expect(state.result).toBeNull();
   });
+
+  it("is also active for a tied round-robin matchup (ties are no longer allowed)", async () => {
+    const stores = tiedFinal("round_robin");
+    const service = buildService(stores);
+    const state = await service.getState(TID, asUser("a1"), MID);
+    expect(state.active).toBe(true);
+  });
 });
 
 describe("suddenDeathService.chooseRep", () => {
@@ -328,6 +335,17 @@ describe("suddenDeathService.enterResult", () => {
     expect(stores.sd?.winnerTeamId).toBe(TA);
     expect(stores.matchup.status).toBe("final");
     expect(stores.matchup.winnerTeamId).toBe(TA);
+  });
+
+  it("lets an admin edit an already-recorded result", async () => {
+    await pickBothReps(service);
+    await service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 5, scoreB: 3 });
+    expect(stores.matchup.winnerTeamId).toBe(TA);
+
+    // Corrected: teamB actually won.
+    await service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 3, scoreB: 5 });
+    expect(stores.sd?.winnerTeamId).toBe(TB);
+    expect(stores.matchup.winnerTeamId).toBe(TB);
   });
 
   it("requires both reps first", async () => {

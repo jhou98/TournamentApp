@@ -49,8 +49,6 @@ export interface StandingRow {
   matchupsPlayed: number;
   matchupsWon: number;
   matchupsLost: number;
-  matchupsTied: number;
-  points: number;
   gamesWon: number;
   gamesLost: number;
   gameDiff: number;

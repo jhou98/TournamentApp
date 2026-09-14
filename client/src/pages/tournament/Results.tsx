@@ -107,16 +107,12 @@ function MatchupCard({
 
   const statusPill = m.winnerTeamName ? (
     <Pill tone="success" icon="check">
-      {m.winnerTeamName} wins{m.tied ? " (overtime)" : ""}
+      {m.winnerTeamName} wins{m.tied ? " (sudden death)" : ""}
     </Pill>
   ) : m.tied ? (
-    m.stage === "round_robin" ? (
-      <Pill tone="info">Tie</Pill>
-    ) : (
-      <Pill tone="warning" icon="bolt">
-        Overtime
-      </Pill>
-    )
+    <Pill tone="warning" icon="bolt">
+      Sudden death
+    </Pill>
   ) : m.status === "in_progress" ? (
     <Pill tone="warning">In progress</Pill>
   ) : (
@@ -170,9 +166,7 @@ function MatchupCard({
         </div>
       ))}
 
-      {m.stage !== "round_robin" && (
-        <Overtime matchupId={m.id} mode="scoring" isAdmin={canScore} myTeamId={null} onResolved={onResolved} />
-      )}
+      <Overtime matchupId={m.id} mode="scoring" isAdmin={canScore} myTeamId={null} onResolved={onResolved} />
     </Card>
   );
 }
@@ -234,7 +228,7 @@ function GameRow({
                 onClick={() => onScore(g.id, Number(home), Number(away))}
                 disabled={home === "" || away === ""}
               >
-                {scored ? "Edit" : "Save"}
+                Save
               </Button>
             </span>
           ) : (

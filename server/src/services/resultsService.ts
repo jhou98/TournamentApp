@@ -140,9 +140,9 @@ export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
       status = "final";
       winnerTeamId = result.winner === "A" ? matchup.teamAId : matchup.teamBId;
     } else if (result.allFinal && result.tied) {
-      // A level game tally: round-robin has no tiebreaker, so it's a completed
-      // draw. Playoffs go to sudden death, so the matchup stays open (US12).
-      status = matchup.stage === "round_robin" ? "final" : "in_progress";
+      // A level game tally never finalizes as a draw — every stage (round robin
+      // included) goes to sudden death, so the matchup stays open.
+      status = "in_progress";
       winnerTeamId = null;
     } else if (result.finalGames > 0) {
       status = "in_progress";

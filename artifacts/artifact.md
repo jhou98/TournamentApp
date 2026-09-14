@@ -8,7 +8,27 @@
 > death — US11–US12), and Part 6 (multi-tournament + per-tournament access —
 > **US28**, minus the coin-reset piece deferred with the rest of the economy)
 > have landed. **Phase 0 is complete.** Next up: Phase 1 (economy). Owner:
-> @jhou98. Last updated: 2026-09-13.
+> @jhou98. Last updated: 2026-09-14.
+>
+> **Changelog (2026-09-14) — no ties (reverses D19):** round-robin draws are gone.
+> A round-robin matchup with a level game tally now behaves exactly like a tied
+> playoff matchup: it stays `in_progress` and goes to **sudden death** (same
+> rep-pick + 1v1 flow, same `sudden_death_rule`) — the winner is credited the
+> round-robin win. `isTiedPlayoff` (sudden-death service) is renamed
+> `isTiedMatchup` and no longer gates on stage. **Standings** drop **points**
+> and the tie column entirely: `MATCHUP_POINTS`/`StandingRow.points`/
+> `matchupsTied` are removed, and ranking is now **matchups won → game
+> differential → point differential → team name** (equivalent to the old
+> points sort once ties can't happen). UI shows **W-L** (no `-T`). **Admin edit:**
+> `POST /api/admin/matchups/:id/sudden-death` no longer rejects a resubmit —
+> an admin can correct a wrong sudden-death score/rep-side after the matchup
+> already finalized (mirrors the existing re-editable `PATCH /api/admin/games/:id`).
+> The `Overtime` component (Results + Captain Panel) now shows the score form
+> alongside a recorded result, pre-filled, so admins can edit in place; its UI
+> label changes from **"Overtime"** to **"Sudden death"** for both stages (the
+> round-robin-only **"Tie"** pill is gone — a tied round-robin matchup now shows
+> the same **"Sudden death"** pill as a tied playoff matchup). **Results:** the
+> per-game score button always reads **"Save"** (was "Edit" once a score existed).
 >
 > **Changelog (2026-09-13) — UI refresh:** the client was rebuilt on the warm
 > "Friendsgiving" look from `artifacts/example-design-25.png`: **Tailwind v4** (tokens in
@@ -410,9 +430,10 @@ team, and captain.
    winner auto-compute. Admin can re-edit a final game; standings and coins recompute idempotently.
 6. **Standings** (record → differential → tiebreaker) update live and, at round-robin's end, **seed
    the playoff bracket** for the top `playoff_qualifiers`.
-7. **Playoffs → final** reuse the matchup structure. A game-win **tie** triggers **sudden death**:
-   each captain names one representative, admin enters the `sudden_death` result under
-   `sudden_death_rule`; winner advances. Final winner is recorded as champion.
+7. A game-win **tie**, in round robin or playoffs, triggers **sudden death**: each captain
+   names one representative, admin enters (and can edit) the `sudden_death` result under
+   `sudden_death_rule`; the winner takes the round-robin win or advances in the bracket.
+   **Playoffs → final** reuse the matchup structure; the final winner is recorded as champion.
 
 **③ Earn & spend coins (US13–US24, P1–P2)**
 - **On finalize,** each player on a pair gets a `match_result` coin_transaction from `computeCoinDelta`,
@@ -470,7 +491,7 @@ POST   /api/admin/teams/auto-balance    generate balanced teams from the player 
 POST   /api/admin/schedule/generate     build round robin + court assignments from config
 POST   /api/admin/playoffs/seed         seed bracket from final standings (top playoff_qualifiers)
 PATCH  /api/admin/games/:id             enter/edit a score {score_home, score_away, court_id?}
-POST   /api/admin/matchups/:id/sudden-death   record 1v1 result {rep_a, rep_b, score_a, score_b}
+POST   /api/admin/matchups/:id/sudden-death   record/edit 1v1 result {rep_a, rep_b, score_a, score_b} (any tied stage)
 POST   /api/admin/powerups              create/edit a powerup
 POST   /api/admin/bounties              create a bounty
 POST   /api/admin/missions              assign a secret mission {user_id, reward, expires_round?}
@@ -545,7 +566,7 @@ between captains → lineups → randomized matchups → results → standings �
 | **D16** | Streak bonus direction | **Both, configurable** via `streak_rule.direction` (`loss` \| `win` \| `both`). Losing-streak protection default from the source doc (+25/+50/+75 at 2/3/4+ losses); win-streak reward uses the same tiered shape. A streak resets when the run breaks. Amounts/tiers admin-tunable. |
 | **D17** | Bounty / mission completion | **Admin marks complete.** Commissioner/admin confirms a bounty or mission was earned, which writes the coin credit. (Auto-detection of common bounty conditions can be added later.) |
 | **D18** | Password management | **Deferred to a later phase (P3 account settings).** Passwords are bcrypt-hashed and never viewable. Self-service change password (`POST /api/me/password`) and admin reset (`POST /api/admin/users/:id/password`) are planned but intentionally not in Phase 0. See §5. |
-| **D19** | Round-robin ties & ranking | **Sudden death is playoff-only** (US12); a round-robin matchup with a level game tally is a **completed draw** (finalizes, no winner). Standings track **W-L-T** and rank by **league points (win 3, tie 1, loss 0) → game differential → point differential → team name**. A draw is only possible when games-per-matchup is even (e.g. 2 or 4 pairs, or the default 3×2=6 → 3–3); an odd total can't tie. Admin-defined tiebreaker still deferred. |
+| **D19** | Round-robin ties & ranking | **Superseded 2026-09-14 — no ties at all.** Sudden death now applies to **every stage**, round robin included: a level game tally stays `in_progress` and goes to the same 1v1 decider as a playoff tie; there's no completed draw. Standings drop points/the tie column and rank by **matchups won → game differential → point differential → team name**. Admin-defined tiebreaker still deferred. |
 
 ### Open — deferred (P1, **not P0 blockers**)
 > These only bite once the economy lands; settle during implementation. P0 doesn't touch them.

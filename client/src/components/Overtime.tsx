@@ -21,13 +21,14 @@ export interface OvertimeState {
 }
 
 /**
- * Overtime (1v1 tiebreaker) for a tied playoff matchup. Self-contained: fetches
- * its own state and renders nothing unless overtime is active or already decided.
- * `myTeamId` is the team the viewer captains in this matchup, or null.
+ * Sudden death (1v1 tiebreaker) for a matchup tied on game wins — round robin or
+ * playoffs. Self-contained: fetches its own state and renders nothing unless
+ * sudden death is active or already decided. `myTeamId` is the team the viewer
+ * captains in this matchup, or null.
  *
  * `mode` splits the flow by page:
  *  - "setup"  (Captain Panel): captains/admin pick representatives; no score entry.
- *  - "scoring" (Results): admin enters the 1v1 result; reps shown read-only.
+ *  - "scoring" (Results): admin enters (and can edit) the 1v1 result; reps shown read-only.
  */
 export function Overtime({
   matchupId,
@@ -51,6 +52,10 @@ export function Overtime({
     try {
       const s = await api<OvertimeState>(`/matchups/${matchupId}/sudden-death`);
       setSd(s.active || s.result ? s : null);
+      if (s.result) {
+        setScoreA(String(s.result.scoreA));
+        setScoreB(String(s.result.scoreB));
+      }
     } catch {
       setSd(null);
     }
@@ -83,7 +88,7 @@ export function Overtime({
     <div className="rounded-card border border-amber/40 bg-amber-soft/60 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Icon name="bolt" size={16} className="text-amber-ink" />
-        <span className="font-bold">Overtime</span>
+        <span className="font-bold">Sudden death</span>
         {sd.result ? (
           <Pill tone="success">Final</Pill>
         ) : (
@@ -133,48 +138,47 @@ export function Overtime({
         ))}
       </div>
 
-      {sd.result ? (
+      {sd.result && (
         <p className="mt-3 font-bold">
-          Result: {sd.result.scoreA}–{sd.result.scoreB} · {sd.result.winnerName} advances
+          Result: {sd.result.scoreA}–{sd.result.scoreB} · {sd.result.winnerName} wins
         </p>
-      ) : (
-        mode === "scoring" &&
-        isAdmin && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[13px]">{sd.teamA.name}</span>
-            <Input
-              className="ctl-sm w-16 text-center"
-              value={scoreA}
-              onChange={(e) => setScoreA(e.target.value)}
-              inputMode="numeric"
-            />
-            <span>–</span>
-            <Input
-              className="ctl-sm w-16 text-center"
-              value={scoreB}
-              onChange={(e) => setScoreB(e.target.value)}
-              inputMode="numeric"
-            />
-            <span className="text-[13px]">{sd.teamB.name}</span>
-            <Button
-              size="sm"
-              disabled={!bothReps || scoreA === "" || scoreB === ""}
-              onClick={() =>
-                act(() =>
-                  api(`/admin/matchups/${matchupId}/sudden-death`, {
-                    method: "POST",
-                    body: JSON.stringify({ scoreA: Number(scoreA), scoreB: Number(scoreB) }),
-                  }),
-                )
-              }
-            >
-              Record overtime result
-            </Button>
-            {!bothReps && (
-              <span className="text-xs text-ink-faint">reps needed (set on Captain Panel)</span>
-            )}
-          </div>
-        )
+      )}
+
+      {mode === "scoring" && isAdmin && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[13px]">{sd.teamA.name}</span>
+          <Input
+            className="ctl-sm w-16 text-center"
+            value={scoreA}
+            onChange={(e) => setScoreA(e.target.value)}
+            inputMode="numeric"
+          />
+          <span>–</span>
+          <Input
+            className="ctl-sm w-16 text-center"
+            value={scoreB}
+            onChange={(e) => setScoreB(e.target.value)}
+            inputMode="numeric"
+          />
+          <span className="text-[13px]">{sd.teamB.name}</span>
+          <Button
+            size="sm"
+            disabled={!bothReps || scoreA === "" || scoreB === ""}
+            onClick={() =>
+              act(() =>
+                api(`/admin/matchups/${matchupId}/sudden-death`, {
+                  method: "POST",
+                  body: JSON.stringify({ scoreA: Number(scoreA), scoreB: Number(scoreB) }),
+                }),
+              )
+            }
+          >
+            Save
+          </Button>
+          {!bothReps && (
+            <span className="text-xs text-ink-faint">reps needed (set on Captain Panel)</span>
+          )}
+        </div>
       )}
     </div>
   );

@@ -33,8 +33,7 @@ export function Standings() {
                 <tr>
                   <th>#</th>
                   <th>Team</th>
-                  <th>Pts</th>
-                  <th>W-L-T</th>
+                  <th>W-L</th>
                   <th>Games</th>
                   <th>Game diff</th>
                   <th>Pt diff</th>
@@ -51,10 +50,7 @@ export function Standings() {
                       </span>
                     </td>
                     <td className="tabular-nums">
-                      <Pill tone="brand">{r.points}</Pill>
-                    </td>
-                    <td className="tabular-nums">
-                      {r.matchupsWon}–{r.matchupsLost}–{r.matchupsTied}
+                      {r.matchupsWon}–{r.matchupsLost}
                     </td>
                     <td className="tabular-nums">
                       {r.gamesWon}–{r.gamesLost}
@@ -67,9 +63,9 @@ export function Standings() {
             </table>
           </div>
           <p className="mt-3 text-xs text-ink-muted">
-            Points: win 3, tie 1, loss 0. Ranked by points, then game differential, then point
-            differential. Round-robin matchups can end in a tie (no overtime in pool play). Rank
-            seeds the playoff bracket once pool play ends.
+            Ranked by wins, then game differential, then point differential. A matchup tied on
+            game wins goes to sudden death (1v1) — there are no ties. Rank seeds the playoff
+            bracket once pool play ends.
           </p>
         </Card>
       )}

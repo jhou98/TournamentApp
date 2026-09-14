@@ -69,10 +69,6 @@ export function computeMatchupResult(games: GameResultInput[], totalGames?: numb
   return { homeWins, awayWins, finalGames, totalGames: total, allFinal, decided, tied, winner };
 }
 
-/** Points awarded per matchup outcome (round robin). A tie is possible whenever
- * games-per-matchup is even; sudden death is playoff-only, so RR draws stand. */
-export const MATCHUP_POINTS = { win: 3, tie: 1, loss: 0 } as const;
-
 /** Per-team standings row (US10). All quantities derived from finalized games. */
 export interface StandingRow {
   teamId: string;
@@ -80,9 +76,6 @@ export interface StandingRow {
   matchupsPlayed: number;
   matchupsWon: number;
   matchupsLost: number;
-  matchupsTied: number;
-  /** League points: win 3, tie 1, loss 0. */
-  points: number;
   gamesWon: number;
   gamesLost: number;
   gameDiff: number;
@@ -99,11 +92,12 @@ interface MatchupResultInput extends MatchupTeamsInput {
 }
 
 /**
- * Build ranked standings. A **completed** matchup (`status = final`) credits the
- * record: a winner → win/loss, no winner → a tie for both. **Games won/lost** and
- * **point differential** count every finalized game. Ranking: **league points
- * (W=3, T=1, L=0) → game differential → point differential → team name** (a
- * stable, deterministic final tiebreaker; an admin-defined one is deferred, US10).
+ * Build ranked standings. A **completed** matchup (`status = final`) always has a
+ * winner — a level game tally goes to sudden death instead of finalizing, so no
+ * draw ever reaches this function. **Games won/lost** and **point differential**
+ * count every finalized game. Ranking: **matchups won → game differential → point
+ * differential → team name** (a stable, deterministic final tiebreaker; an
+ * admin-defined one is deferred, US10).
  */
 export function computeStandings(
   teams: TeamInput[],
@@ -118,8 +112,6 @@ export function computeStandings(
       matchupsPlayed: 0,
       matchupsWon: 0,
       matchupsLost: 0,
-      matchupsTied: 0,
-      points: 0,
       gamesWon: 0,
       gamesLost: 0,
       gameDiff: 0,
@@ -156,7 +148,7 @@ export function computeStandings(
   }
 
   // Per-matchup: only completed matchups count toward the record. A finalized
-  // matchup with no winner is a draw (both teams get a tie).
+  // matchup always has a winner (ties go to sudden death, never to `final`).
   for (const m of matchups) {
     if (m.status !== "final") continue;
     const a = rows.get(m.teamAId);
@@ -164,27 +156,21 @@ export function computeStandings(
     if (!a || !b) continue;
     a.matchupsPlayed++;
     b.matchupsPlayed++;
-    if (!m.winnerTeamId) {
-      a.matchupsTied++;
-      b.matchupsTied++;
-    } else {
-      const winner = m.winnerTeamId === m.teamAId ? a : b;
-      const loser = m.winnerTeamId === m.teamAId ? b : a;
-      winner.matchupsWon++;
-      loser.matchupsLost++;
-    }
+    const winner = m.winnerTeamId === m.teamAId ? a : b;
+    const loser = m.winnerTeamId === m.teamAId ? b : a;
+    winner.matchupsWon++;
+    loser.matchupsLost++;
   }
 
   const ordered = [...rows.values()];
   for (const r of ordered) {
-    r.points = r.matchupsWon * MATCHUP_POINTS.win + r.matchupsTied * MATCHUP_POINTS.tie;
     r.gameDiff = r.gamesWon - r.gamesLost;
     r.pointDiff = r.pointsFor - r.pointsAgainst;
   }
 
   ordered.sort(
     (x, y) =>
-      y.points - x.points ||
+      y.matchupsWon - x.matchupsWon ||
       y.gameDiff - x.gameDiff ||
       y.pointDiff - x.pointDiff ||
       x.teamName.localeCompare(y.teamName),
