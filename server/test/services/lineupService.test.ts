@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeLineupService, type LineupService } from "../../src/services/lineupService.js";
 import { ConflictError, ForbiddenError, ValidationError } from "../../src/domain/errors.js";
+import { DEFAULT_COIN_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   CourtRepo,
   GameRecord,
@@ -57,6 +58,7 @@ function detail(): TournamentDetail {
     roundRobinCycles: 1,
     playoffQualifiers: 2,
     courtCount: 6,
+    coinRule: DEFAULT_COIN_RULE,
   };
 }
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeScheduleService, type ScheduleService } from "../../src/services/scheduleService.js";
 import { ConflictError, NotFoundError, ValidationError } from "../../src/domain/errors.js";
+import { DEFAULT_COIN_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   CourtRecord,
   CourtRepo,
@@ -43,6 +44,7 @@ function defaultDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     roundRobinCycles: 1,
     playoffQualifiers: 4,
     courtCount: 6,
+    coinRule: DEFAULT_COIN_RULE,
     ...overrides,
   };
 }

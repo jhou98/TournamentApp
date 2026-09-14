@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { getDb } from "./client.js";
+import type { CoinRule } from "../../../domain/coinRule.js";
 import type { TournamentDetail, TournamentRepo } from "../../../ports/index.js";
 
 const DETAIL_SELECT = {
@@ -14,6 +15,7 @@ const DETAIL_SELECT = {
   roundRobinCycles: true,
   playoffQualifiers: true,
   courtCount: true,
+  coinRule: true,
 } as const;
 
 const SUMMARY_SELECT = { id: true, name: true, status: true } as const;
@@ -30,9 +32,13 @@ type DetailRow = {
   roundRobinCycles: number;
   playoffQualifiers: number;
   courtCount: number;
+  coinRule: Prisma.JsonValue;
 };
 
-const toDetail = (row: DetailRow): TournamentDetail => row;
+const toDetail = (row: DetailRow): TournamentDetail => ({
+  ...row,
+  coinRule: row.coinRule as unknown as CoinRule,
+});
 
 export function makePrismaTournamentRepo(): TournamentRepo {
   return {

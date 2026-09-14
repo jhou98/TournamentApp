@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeResultsService, type ResultsService } from "../../src/services/resultsService.js";
+import type { EconomyService } from "../../src/services/economyService.js";
 import { ConflictError, NotFoundError, ValidationError } from "../../src/domain/errors.js";
+import { DEFAULT_COIN_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   CourtRepo,
   GameRecord,
@@ -48,6 +50,7 @@ function detail(): TournamentDetail {
     roundRobinCycles: 1,
     playoffQualifiers: 2,
     courtCount: 6,
+    coinRule: DEFAULT_COIN_RULE,
   };
 }
 
@@ -307,6 +310,13 @@ function buildService(stores: Stores): ResultsService {
     },
   };
 
+  const economy: EconomyService = {
+    async recomputeTournamentLedger() {
+      // No-op in results-service tests — the ledger recompute itself is
+      // covered by economyService.test.ts.
+    },
+  };
+
   return makeResultsService({
     tournaments,
     matchups,
@@ -317,6 +327,7 @@ function buildService(stores: Stores): ResultsService {
     lineups,
     games,
     uow: passthroughUow,
+    economy,
   });
 }
 

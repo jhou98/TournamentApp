@@ -5,6 +5,7 @@ import {
   type GameResultInput,
   type StandingRow,
 } from "../domain/standings.js";
+import type { EconomyService } from "./economyService.js";
 import type {
   CourtRepo,
   GameRecord,
@@ -89,6 +90,7 @@ export interface ResultsServiceDeps {
   lineups: LineupRepo;
   games: GameRepo;
   uow: UnitOfWork;
+  economy: EconomyService;
 }
 
 export interface EnterScoreInput {
@@ -197,6 +199,7 @@ export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
           ...(input.courtId ? { courtId: input.courtId } : {}),
         });
         await recomputeMatchup(game.matchupId, t);
+        await deps.economy.recomputeTournamentLedger(t.id);
       });
     },
 

@@ -1,3 +1,5 @@
+import type { CoinRule } from "../domain/coinRule.js";
+
 export interface TournamentRef {
   id: string;
   name: string;
@@ -24,6 +26,7 @@ export interface TournamentConfig {
 
 export interface TournamentDetail extends TournamentRef, TournamentConfig {
   status: TournamentStatus;
+  coinRule: CoinRule;
 }
 
 /** Everything needed to create a tournament row (config + the rules JSON blobs). */

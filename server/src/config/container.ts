@@ -22,6 +22,7 @@ import { makeRosterService, type RosterService } from "../services/rosterService
 import { makeScheduleService, type ScheduleService } from "../services/scheduleService.js";
 import { makeLineupService, type LineupService } from "../services/lineupService.js";
 import { makeResultsService, type ResultsService } from "../services/resultsService.js";
+import { makeEconomyService, type EconomyService } from "../services/economyService.js";
 import { makePlayoffsService, type PlayoffsService } from "../services/playoffsService.js";
 import { makeSuddenDeathService, type SuddenDeathService } from "../services/suddenDeathService.js";
 import type { UnitOfWork } from "../ports/index.js";
@@ -40,6 +41,7 @@ export interface Container {
     results: ResultsService;
     playoffs: PlayoffsService;
     suddenDeath: SuddenDeathService;
+    economy: EconomyService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -57,7 +59,6 @@ export function buildContainer(env: Env): Container {
   const gamesRepo = makePrismaGameRepo();
   const lineups = makePrismaLineupRepo();
   const suddenDeathRepo = makePrismaSuddenDeathRepo();
-  // Not yet consumed by any service — Commit 3 wires this into the coin-earning use-case.
   const coinLedger = makePrismaCoinLedgerRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
@@ -109,6 +110,14 @@ export function buildContainer(env: Env): Container {
     uow: unitOfWork,
   });
 
+  const economy = makeEconomyService({
+    tournaments,
+    games: gamesRepo,
+    lineups,
+    coinLedger,
+    uow: unitOfWork,
+  });
+
   const results = makeResultsService({
     tournaments,
     matchups,
@@ -119,6 +128,7 @@ export function buildContainer(env: Env): Container {
     lineups,
     games: gamesRepo,
     uow: unitOfWork,
+    economy,
   });
 
   const playoffs = makePlayoffsService({
@@ -154,6 +164,7 @@ export function buildContainer(env: Env): Container {
       results,
       playoffs,
       suddenDeath,
+      economy,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };
