@@ -1,4 +1,5 @@
 import type { TournamentConfig } from "../ports/index.js";
+import type { CoinRule } from "./coinRule.js";
 
 /**
  * The reference-tournament defaults (§4): 4 teams of 6, 3-round round robin,
@@ -17,7 +18,12 @@ export const DEFAULT_TOURNAMENT_CONFIG: TournamentConfig = {
   courtCount: 6,
 };
 
-export const DEFAULT_COIN_RULE = { perWin: 100, perCloseLoss: 75, perLoss: 50 };
+export const DEFAULT_COIN_RULE: CoinRule = {
+  perWin: 100,
+  perCloseLoss: 75,
+  perLoss: 50,
+  closeLossMargin: 3,
+};
 
 export const DEFAULT_STREAK_RULE = {
   direction: "loss",
