@@ -1,5 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import {
+  DEFAULT_COIN_RULE,
+  DEFAULT_STREAK_RULE,
+  DEFAULT_SUDDEN_DEATH_RULE,
+  DEFAULT_TOURNAMENT_CONFIG,
+} from "../src/domain/tournamentDefaults.js";
 
 const prisma = new PrismaClient();
 
@@ -19,24 +25,10 @@ async function main() {
       id: DEFAULT_TOURNAMENT_ID,
       name: "Friendsgiving Badminton Tournament",
       status: "setup",
-      teamCount: 4,
-      teamSize: 6,
-      pairSize: 2,
-      pairsPerLineup: 3,
-      roundsPerMatchup: 2,
-      roundRobinCycles: 1,
-      playoffQualifiers: 4,
-      courtCount: 6,
-      coinRule: { perWin: 100, perCloseLoss: 75, perLoss: 50 },
-      streakRule: {
-        direction: "loss",
-        tiers: [
-          { after: 2, bonus: 25 },
-          { after: 3, bonus: 50 },
-          { after: 4, bonus: 75 },
-        ],
-      },
-      suddenDeathRule: { first_to: 5, win_by: 2, cap: 7 },
+      ...DEFAULT_TOURNAMENT_CONFIG,
+      coinRule: DEFAULT_COIN_RULE,
+      streakRule: DEFAULT_STREAK_RULE,
+      suddenDeathRule: DEFAULT_SUDDEN_DEATH_RULE,
     },
   });
 

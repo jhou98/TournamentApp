@@ -61,15 +61,15 @@ export interface ScheduleServiceDeps {
 }
 
 export interface ScheduleService {
-  getConfig(): Promise<TournamentDetail>;
-  updateConfig(patch: Partial<TournamentConfig>): Promise<TournamentDetail>;
-  listCourts(): Promise<CourtRecord[]>;
-  renameCourt(courtId: string, label: string): Promise<CourtRecord>;
-  reassignCourt(gameId: string, courtId: string): Promise<void>;
-  editMatchup(matchupId: string, teamAId: string, teamBId: string): Promise<void>;
-  generate(): Promise<ScheduleView>;
-  getSchedule(): Promise<ScheduleView>;
-  reset(): Promise<void>;
+  getConfig(tournamentId: string): Promise<TournamentDetail>;
+  updateConfig(tournamentId: string, patch: Partial<TournamentConfig>): Promise<TournamentDetail>;
+  listCourts(tournamentId: string): Promise<CourtRecord[]>;
+  renameCourt(tournamentId: string, courtId: string, label: string): Promise<CourtRecord>;
+  reassignCourt(tournamentId: string, gameId: string, courtId: string): Promise<void>;
+  editMatchup(tournamentId: string, matchupId: string, teamAId: string, teamBId: string): Promise<void>;
+  generate(tournamentId: string): Promise<ScheduleView>;
+  getSchedule(tournamentId: string): Promise<ScheduleView>;
+  reset(tournamentId: string): Promise<void>;
 }
 
 const CONFIG_KEYS: (keyof TournamentConfig)[] = [
@@ -84,8 +84,8 @@ const CONFIG_KEYS: (keyof TournamentConfig)[] = [
 ];
 
 export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService {
-  async function requireTournament(): Promise<TournamentDetail> {
-    const t = await deps.tournaments.getCurrentDetail();
+  async function requireTournament(tournamentId: string): Promise<TournamentDetail> {
+    const t = await deps.tournaments.getDetail(tournamentId);
     if (!t) throw new ValidationError("No tournament exists yet");
     return t;
   }
@@ -136,8 +136,8 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
     return { status, courts, rounds };
   }
 
-  async function getSchedule(): Promise<ScheduleView> {
-    const t = await requireTournament();
+  async function getSchedule(tournamentId: string): Promise<ScheduleView> {
+    const t = await requireTournament(tournamentId);
     const [matchupViews, courts] = await Promise.all([
       deps.matchups.listByTournament(t.id),
       ensureCourts(t),
@@ -146,12 +146,12 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
   }
 
   return {
-    async getConfig() {
-      return requireTournament();
+    async getConfig(tournamentId) {
+      return requireTournament(tournamentId);
     },
 
-    async updateConfig(patch) {
-      const t = await requireTournament();
+    async updateConfig(tournamentId, patch) {
+      const t = await requireTournament(tournamentId);
       if (t.status !== "setup") {
         throw new ConflictError("Config can only be edited while the tournament is in setup");
       }
@@ -183,29 +183,31 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
       });
     },
 
-    async listCourts() {
-      const t = await requireTournament();
+    async listCourts(tournamentId) {
+      const t = await requireTournament(tournamentId);
       return ensureCourts(t);
     },
 
-    async renameCourt(courtId, label) {
-      const t = await requireTournament();
+    async renameCourt(tournamentId, courtId, label) {
+      const t = await requireTournament(tournamentId);
       const court = await deps.courts.findById(courtId);
       if (!court || court.tournamentId !== t.id) throw new NotFoundError("Court not found");
       return deps.courts.rename(courtId, label);
     },
 
-    async reassignCourt(gameId, courtId) {
-      const t = await requireTournament();
+    async reassignCourt(tournamentId, gameId, courtId) {
+      const t = await requireTournament(tournamentId);
       const game = await deps.games.findById(gameId);
       if (!game) throw new NotFoundError("Game not found");
+      const gameMatchup = await deps.matchups.findById(game.matchupId);
+      if (!gameMatchup || gameMatchup.tournamentId !== t.id) throw new NotFoundError("Game not found");
       const court = await deps.courts.findById(courtId);
       if (!court || court.tournamentId !== t.id) throw new NotFoundError("Court not found");
       await deps.games.setCourt(gameId, courtId);
     },
 
-    async editMatchup(matchupId, teamAId, teamBId) {
-      const t = await requireTournament();
+    async editMatchup(tournamentId, matchupId, teamAId, teamBId) {
+      const t = await requireTournament(tournamentId);
       if (teamAId === teamBId) throw new ValidationError("A matchup needs two different teams");
       const matchup = await deps.matchups.findById(matchupId);
       if (!matchup || matchup.tournamentId !== t.id) throw new NotFoundError("Matchup not found");
@@ -216,8 +218,8 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
       await deps.matchups.updateTeams(matchupId, teamAId, teamBId);
     },
 
-    async generate() {
-      const t = await requireTournament();
+    async generate(tournamentId) {
+      const t = await requireTournament(tournamentId);
       if (t.status !== "setup") {
         throw new ConflictError("Schedule can only be generated while the tournament is in setup");
       }
@@ -269,13 +271,13 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
         await deps.tournaments.setStatus(t.id, "round_robin");
       });
 
-      return getSchedule();
+      return getSchedule(t.id);
     },
 
     getSchedule,
 
-    async reset() {
-      const t = await requireTournament();
+    async reset(tournamentId) {
+      const t = await requireTournament(tournamentId);
       if (t.status === "setup") return;
       const finalGames = await deps.games.countByStatus(t.id, "final");
       if (finalGames > 0) {

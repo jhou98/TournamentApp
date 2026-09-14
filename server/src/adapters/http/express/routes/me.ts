@@ -1,17 +1,30 @@
 import { Router } from "express";
 import type { AuthService } from "../../../../services/authService.js";
+import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { asyncHandler } from "../asyncHandler.js";
+import { requestedTournamentId } from "../middleware/tournament.js";
 
-export function meRouter(auth: AuthService, mw: AuthMiddleware): Router {
+export function meRouter(
+  auth: AuthService,
+  tournaments: TournamentService,
+  mw: AuthMiddleware,
+): Router {
   const router = Router();
 
   router.get(
     "/",
     mw.requireAuth,
     asyncHandler(async (req, res) => {
-      const profile = await auth.me(req.user!.id);
-      res.json(profile);
+      // Resolve softly: the profile's role is per active tournament, but /me must
+      // still work before the client has picked one (or with an unusable choice).
+      let tournamentId: string | null = null;
+      try {
+        tournamentId = await tournaments.resolveActive(req.user!, requestedTournamentId(req));
+      } catch {
+        tournamentId = null;
+      }
+      res.json(await auth.me(req.user!.id, tournamentId));
     }),
   );
 

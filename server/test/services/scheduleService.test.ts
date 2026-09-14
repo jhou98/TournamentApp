@@ -62,11 +62,19 @@ function buildService(stores: Stores): ScheduleService {
   let gameSeq = 0;
 
   const tournaments: TournamentRepo = {
-    async getCurrent() {
-      return { id: stores.tournament.id, name: stores.tournament.name };
+    async getDetail(id) {
+      return id === stores.tournament.id ? { ...stores.tournament } : null;
     },
-    async getCurrentDetail() {
-      return { ...stores.tournament };
+    async list() {
+      const { id, name, status } = stores.tournament;
+      return [{ id, name, status }];
+    },
+    async listByIds(ids) {
+      const { id, name, status } = stores.tournament;
+      return ids.includes(id) ? [{ id, name, status }] : [];
+    },
+    async create() {
+      throw new Error("not used");
     },
     async setStatus(_id, status) {
       stores.tournament.status = status;
@@ -322,7 +330,7 @@ describe("scheduleService.generate", () => {
   });
 
   it("builds the round-robin, seeds courts, and moves status to round_robin", async () => {
-    const view = await service.generate();
+    const view = await service.generate(TID);
 
     expect(stores.tournament.status).toBe("round_robin");
     expect(view.status).toBe("round_robin");
@@ -344,7 +352,7 @@ describe("scheduleService.generate", () => {
   });
 
   it("never double-books a court among concurrent games", async () => {
-    const view = await service.generate();
+    const view = await service.generate(TID);
     for (const round of view.rounds) {
       // Concurrency group = same matchup roundNo within an RR round.
       for (const roundNo of [1, 2]) {
@@ -360,24 +368,24 @@ describe("scheduleService.generate", () => {
 
   it("doubles the rounds when roundRobinCycles is 2", async () => {
     stores.tournament.roundRobinCycles = 2;
-    const view = await service.generate();
+    const view = await service.generate(TID);
     expect(view.rounds).toHaveLength(6);
     expect(view.rounds.flatMap((r) => r.matchups)).toHaveLength(12);
   });
 
   it("assigns every game a court", async () => {
-    await service.generate();
+    await service.generate(TID);
     expect(stores.games.every((g) => g.courtId !== null)).toBe(true);
   });
 
   it("rejects generation unless the team count matches config", async () => {
     stores.teams = makeTeams(3); // config wants 4
-    await expect(service.generate()).rejects.toBeInstanceOf(ValidationError);
+    await expect(service.generate(TID)).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("rejects generation when not in setup", async () => {
     stores.tournament.status = "round_robin";
-    await expect(service.generate()).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.generate(TID)).rejects.toBeInstanceOf(ConflictError);
   });
 });
 
@@ -385,10 +393,10 @@ describe("scheduleService.updateConfig", () => {
   it("reseeds courts when courtCount changes", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await service.listCourts(); // lazily seeds 6
+    await service.listCourts(TID); // lazily seeds 6
     expect(stores.courts).toHaveLength(6);
 
-    await service.updateConfig({ courtCount: 4 });
+    await service.updateConfig(TID, { courtCount: 4 });
     expect(stores.tournament.courtCount).toBe(4);
     expect(stores.courts).toHaveLength(4);
     expect(stores.courts.map((c) => c.label)).toEqual(["Court 1", "Court 2", "Court 3", "Court 4"]);
@@ -397,13 +405,13 @@ describe("scheduleService.updateConfig", () => {
   it("rejects config edits once out of setup", async () => {
     const stores = freshStores({ status: "round_robin" });
     const service = buildService(stores);
-    await expect(service.updateConfig({ courtCount: 4 })).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.updateConfig(TID, { courtCount: 4 })).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("rejects playoffQualifiers greater than teamCount", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await expect(service.updateConfig({ playoffQualifiers: 5 })).rejects.toBeInstanceOf(
+    await expect(service.updateConfig(TID, { playoffQualifiers: 5 })).rejects.toBeInstanceOf(
       ValidationError,
     );
   });
@@ -411,7 +419,7 @@ describe("scheduleService.updateConfig", () => {
   it("rejects non-positive values", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await expect(service.updateConfig({ courtCount: 0 })).rejects.toBeInstanceOf(ValidationError);
+    await expect(service.updateConfig(TID, { courtCount: 0 })).rejects.toBeInstanceOf(ValidationError);
   });
 });
 
@@ -419,19 +427,19 @@ describe("scheduleService.reassignCourt & editMatchup", () => {
   it("reassigns a game to another court", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await service.generate();
+    await service.generate(TID);
 
     const game = stores.games[0]!;
     const otherCourt = stores.courts.find((c) => c.id !== game.courtId)!;
-    await service.reassignCourt(game.id, otherCourt.id);
+    await service.reassignCourt(TID, game.id, otherCourt.id);
     expect(stores.games.find((g) => g.id === game.id)!.courtId).toBe(otherCourt.id);
   });
 
   it("rejects reassigning to an unknown court", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await service.generate();
-    await expect(service.reassignCourt(stores.games[0]!.id, "nope")).rejects.toBeInstanceOf(
+    await service.generate(TID);
+    await expect(service.reassignCourt(TID, stores.games[0]!.id, "nope")).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });
@@ -439,9 +447,9 @@ describe("scheduleService.reassignCourt & editMatchup", () => {
   it("swaps a matchup's teams", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await service.generate();
+    await service.generate(TID);
     const m = stores.matchups[0]!;
-    await service.editMatchup(m.id, "team3", "team4");
+    await service.editMatchup(TID, m.id, "team3", "team4");
     const updated = stores.matchups.find((x) => x.id === m.id)!;
     expect([updated.teamAId, updated.teamBId]).toEqual(["team3", "team4"]);
   });
@@ -449,9 +457,9 @@ describe("scheduleService.reassignCourt & editMatchup", () => {
   it("rejects a matchup with two identical teams", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await service.generate();
+    await service.generate(TID);
     await expect(
-      service.editMatchup(stores.matchups[0]!.id, "team1", "team1"),
+      service.editMatchup(TID, stores.matchups[0]!.id, "team1", "team1"),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 });
@@ -460,10 +468,10 @@ describe("scheduleService.reset", () => {
   it("clears the schedule and returns to setup", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await service.generate();
+    await service.generate(TID);
     expect(stores.matchups.length).toBeGreaterThan(0);
 
-    await service.reset();
+    await service.reset(TID);
     expect(stores.tournament.status).toBe("setup");
     expect(stores.matchups).toHaveLength(0);
     expect(stores.games).toHaveLength(0);
@@ -472,8 +480,8 @@ describe("scheduleService.reset", () => {
   it("refuses to reset when a game is already final", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    await service.generate();
+    await service.generate(TID);
     stores.games[0]!.status = "final";
-    await expect(service.reset()).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.reset(TID)).rejects.toBeInstanceOf(ConflictError);
   });
 });

@@ -103,11 +103,19 @@ function freshStores(): Stores {
 
 function buildService(stores: Stores): ResultsService {
   const tournaments: TournamentRepo = {
-    async getCurrent() {
-      return { id: TID, name: "Test" };
+    async getDetail(id) {
+      return id === TID ? { ...stores.tournament } : null;
     },
-    async getCurrentDetail() {
-      return { ...stores.tournament };
+    async list() {
+      const { id, name, status } = stores.tournament;
+      return [{ id, name, status }];
+    },
+    async listByIds(ids) {
+      const { id, name, status } = stores.tournament;
+      return ids.includes(id) ? [{ id, name, status }] : [];
+    },
+    async create() {
+      throw new Error("not used");
     },
     async setStatus() {},
     async updateConfig() {
@@ -166,6 +174,9 @@ function buildService(stores: Stores): ResultsService {
   const memberships: MembershipRepo = {
     async findByUserAndTournament(userId, tid) {
       return stores.memberships.find((m) => m.userId === userId && m.tournamentId === tid) ?? null;
+    },
+    async listByUser(userId) {
+      return stores.memberships.filter((m) => m.userId === userId);
     },
     async listByTeam(teamId) {
       return stores.memberships.filter((m) => m.teamId === teamId);
@@ -330,7 +341,7 @@ async function scoreAll(service: ResultsService, stores: Stores) {
   };
   for (const g of stores.games) {
     const [h, a] = plan[g.id]!;
-    await service.enterScore(asUser("admin1", true), g.id, { scoreHome: h, scoreAway: a });
+    await service.enterScore(TID, asUser("admin1", true), g.id, { scoreHome: h, scoreAway: a });
   }
 }
 
@@ -344,7 +355,7 @@ describe("resultsService.enterScore", () => {
   });
 
   it("records a score, sets the winning pair, and marks the game final", async () => {
-    await service.enterScore(asUser("admin1", true), "g1", { scoreHome: 21, scoreAway: 10 });
+    await service.enterScore(TID, asUser("admin1", true), "g1", { scoreHome: 21, scoreAway: 10 });
     const g = stores.games.find((x) => x.id === "g1")!;
     expect(g.status).toBe("final");
     expect(g.scoreHome).toBe(21);
@@ -362,13 +373,13 @@ describe("resultsService.enterScore", () => {
 
   it("rejects a non-admin", async () => {
     await expect(
-      service.enterScore(asUser("a1"), "g1", { scoreHome: 21, scoreAway: 10 }),
+      service.enterScore(TID, asUser("a1"), "g1", { scoreHome: 21, scoreAway: 10 }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("rejects a tied game score", async () => {
     await expect(
-      service.enterScore(asUser("admin1", true), "g1", { scoreHome: 15, scoreAway: 15 }),
+      service.enterScore(TID, asUser("admin1", true), "g1", { scoreHome: 15, scoreAway: 15 }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
@@ -377,13 +388,13 @@ describe("resultsService.enterScore", () => {
     stores.games[0]!.homePairId = null;
     stores.games[0]!.awayPairId = null;
     await expect(
-      service.enterScore(asUser("admin1", true), "g1", { scoreHome: 21, scoreAway: 10 }),
+      service.enterScore(TID, asUser("admin1", true), "g1", { scoreHome: 21, scoreAway: 10 }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("rejects an unknown game", async () => {
     await expect(
-      service.enterScore(asUser("admin1", true), "nope", { scoreHome: 21, scoreAway: 10 }),
+      service.enterScore(TID, asUser("admin1", true), "nope", { scoreHome: 21, scoreAway: 10 }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -391,8 +402,8 @@ describe("resultsService.enterScore", () => {
     await scoreAll(service, stores);
     expect(stores.matchup.winnerTeamId).toBe(TA);
     // Flip round-2 games so B now wins 4–2.
-    await service.enterScore(asUser("admin1", true), "g1", { scoreHome: 10, scoreAway: 21 });
-    await service.enterScore(asUser("admin1", true), "g6", { scoreHome: 18, scoreAway: 21 });
+    await service.enterScore(TID, asUser("admin1", true), "g1", { scoreHome: 10, scoreAway: 21 });
+    await service.enterScore(TID, asUser("admin1", true), "g6", { scoreHome: 18, scoreAway: 21 });
     // Now A wins g2,g3 (2); B wins g1,g4,g5,g6 (4).
     expect(stores.matchup.winnerTeamId).toBe(TB);
   });
@@ -404,7 +415,7 @@ describe("resultsService.getResults", () => {
     const service = buildService(stores);
     await scoreAll(service, stores);
 
-    const view = await service.getResults(asUser("a1"));
+    const view = await service.getResults(TID, asUser("a1"));
     const m = view.matchups[0]!;
     expect(m.matchupScore).toEqual({ teamA: 4, teamB: 2 });
     expect(m.decided).toBe(true);
@@ -424,7 +435,7 @@ describe("resultsService.getStandings", () => {
     const service = buildService(stores);
     await scoreAll(service, stores);
 
-    const { rows } = await service.getStandings();
+    const { rows } = await service.getStandings(TID);
     expect(rows[0]!.teamId).toBe(TA);
     expect(rows[0]!.matchupsWon).toBe(1);
     expect(rows[0]!.gamesWon).toBe(4);

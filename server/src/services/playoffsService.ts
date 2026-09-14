@@ -22,9 +22,9 @@ const PLAYOFF_ROUND_INDEX = 1;
 
 export interface PlayoffsService {
   /** Admin seeds the bracket from final standings; status → playoffs (US11). */
-  seed(user: PublicUser): Promise<void>;
+  seed(tournamentId: string, user: PublicUser): Promise<void>;
   /** Idempotent advancement: build the final from decided semis; complete on a decided final. */
-  sync(): Promise<void>;
+  sync(tournamentId: string): Promise<void>;
 }
 
 export interface PlayoffsServiceDeps {
@@ -37,8 +37,8 @@ export interface PlayoffsServiceDeps {
 }
 
 export function makePlayoffsService(deps: PlayoffsServiceDeps): PlayoffsService {
-  async function requireTournament(): Promise<TournamentDetail> {
-    const t = await deps.tournaments.getCurrentDetail();
+  async function requireTournament(tournamentId: string): Promise<TournamentDetail> {
+    const t = await deps.tournaments.getDetail(tournamentId);
     if (!t) throw new ValidationError("No tournament exists yet");
     return t;
   }
@@ -64,9 +64,9 @@ export function makePlayoffsService(deps: PlayoffsServiceDeps): PlayoffsService 
   }
 
   return {
-    async seed(user) {
+    async seed(tournamentId, user) {
       if (!user.isAdmin) throw new ForbiddenError("Only an admin can seed the playoffs");
-      const t = await requireTournament();
+      const t = await requireTournament(tournamentId);
       if (t.status !== "round_robin") {
         throw new ConflictError("Playoffs can only be seeded from a running round robin");
       }
@@ -131,8 +131,8 @@ export function makePlayoffsService(deps: PlayoffsServiceDeps): PlayoffsService 
       });
     },
 
-    async sync() {
-      const t = await requireTournament();
+    async sync(tournamentId) {
+      const t = await requireTournament(tournamentId);
       // Run during playoffs, and also when already completed so a final edited
       // back to undecided can re-open the tournament.
       if (t.status !== "playoffs" && t.status !== "completed") return;

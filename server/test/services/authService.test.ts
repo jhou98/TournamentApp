@@ -9,7 +9,6 @@ import type {
   PasswordHasher,
   TeamRepo,
   TokenService,
-  TournamentRepo,
   UserRecord,
   UserRepo,
 } from "../../src/ports/index.js";
@@ -68,6 +67,9 @@ const noMemberships: MembershipRepo = {
   async findByUserAndTournament() {
     return null;
   },
+  async listByUser() {
+    return [];
+  },
   async listByTeam() {
     return [];
   },
@@ -101,21 +103,6 @@ const noTeams: TeamRepo = {
   },
 };
 
-const currentTournament: TournamentRepo = {
-  async getCurrent() {
-    return { id: "t1", name: "Test" };
-  },
-  async getCurrentDetail() {
-    throw new Error("not used");
-  },
-  async setStatus() {
-    throw new Error("not used");
-  },
-  async updateConfig() {
-    throw new Error("not used");
-  },
-};
-
 const fakeHasher: PasswordHasher = {
   async hash(plain) {
     return `hashed:${plain}`;
@@ -145,7 +132,6 @@ function build(overrides?: {
     invites: overrides?.invites ?? fakeInviteRepo(),
     memberships: overrides?.memberships ?? noMemberships,
     teams: overrides?.teams ?? noTeams,
-    tournaments: currentTournament,
     hasher: fakeHasher,
     tokens: fakeTokens,
     bootstrapAdminCode: BOOTSTRAP,
@@ -298,7 +284,7 @@ describe("authService.me", () => {
     };
 
     const auth = build({ users, memberships, teams });
-    const profile = await auth.me(player.id);
+    const profile = await auth.me(player.id, "t1");
     expect(profile.team).toEqual({ id: "team1", name: "Team One" });
     expect(profile.captain?.username).toBe("cap");
     expect(profile.role).toBe("player");

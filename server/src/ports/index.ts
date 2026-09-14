@@ -10,9 +10,11 @@ export type { InviteRepo, InviteRecord } from "./InviteRepo.js";
 export type {
   TournamentRepo,
   TournamentRef,
+  TournamentSummary,
   TournamentDetail,
   TournamentConfig,
   TournamentStatus,
+  NewTournament,
 } from "./TournamentRepo.js";
 export type { CourtRepo, CourtRecord } from "./CourtRepo.js";
 export type {

@@ -12,6 +12,7 @@ import { adminRouter } from "./routes/admin.js";
 import { scheduleRouter } from "./routes/schedule.js";
 import { matchupsRouter } from "./routes/matchups.js";
 import { resultsRouter } from "./routes/results.js";
+import { tournamentsRouter } from "./routes/tournaments.js";
 
 export function createApp(container: Container): Express {
   const app = express();
@@ -22,7 +23,14 @@ export function createApp(container: Container): Express {
   const api = Router();
   api.use("/health", healthRouter(container.services.health));
   api.use("/auth", authRouter(container.services.auth));
-  api.use("/me", meRouter(container.services.auth, container.authMiddleware));
+  api.use(
+    "/me",
+    meRouter(container.services.auth, container.services.tournaments, container.authMiddleware),
+  );
+  api.use(
+    "/tournaments",
+    tournamentsRouter(container.services.tournaments, container.authMiddleware),
+  );
   api.use(
     "/admin",
     adminRouter(
@@ -31,15 +39,24 @@ export function createApp(container: Container): Express {
       container.services.results,
       container.services.playoffs,
       container.services.suddenDeath,
+      container.services.tournaments,
       container.authMiddleware,
     ),
   );
-  api.use("/schedule", scheduleRouter(container.services.schedule, container.authMiddleware));
+  api.use(
+    "/schedule",
+    scheduleRouter(container.services.schedule, container.services.tournaments, container.authMiddleware),
+  );
   api.use(
     "/matchups",
-    matchupsRouter(container.services.lineups, container.services.suddenDeath, container.authMiddleware),
+    matchupsRouter(
+      container.services.lineups,
+      container.services.suddenDeath,
+      container.services.tournaments,
+      container.authMiddleware,
+    ),
   );
-  api.use(resultsRouter(container.services.results, container.authMiddleware));
+  api.use(resultsRouter(container.services.results, container.services.tournaments, container.authMiddleware));
   app.use("/api", api);
 
   // Serve the built SPA in production, with history fallback for client routes.

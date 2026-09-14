@@ -11,6 +11,8 @@ export interface MembershipRecord {
 
 export interface MembershipRepo {
   findByUserAndTournament(userId: string, tournamentId: string): Promise<MembershipRecord | null>;
+  /** Every membership for a user across tournaments (US28 — accessible-tournament set). */
+  listByUser(userId: string): Promise<MembershipRecord[]>;
   listByTeam(teamId: string): Promise<MembershipRecord[]>;
   listByTournament(tournamentId: string): Promise<MembershipRecord[]>;
   /** Assign or move a user to a team within a tournament (one membership per user per tournament). */

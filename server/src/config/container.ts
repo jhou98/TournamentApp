@@ -16,6 +16,7 @@ import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
 import { makeHealthService, type HealthService } from "../services/healthService.js";
 import { makeAuthService, type AuthService } from "../services/authService.js";
+import { makeTournamentService, type TournamentService } from "../services/tournamentService.js";
 import { makeRosterService, type RosterService } from "../services/rosterService.js";
 import { makeScheduleService, type ScheduleService } from "../services/scheduleService.js";
 import { makeLineupService, type LineupService } from "../services/lineupService.js";
@@ -31,6 +32,7 @@ export interface Container {
   services: {
     health: HealthService;
     auth: AuthService;
+    tournaments: TournamentService;
     roster: RosterService;
     schedule: ScheduleService;
     lineups: LineupService;
@@ -64,11 +66,12 @@ export function buildContainer(env: Env): Container {
     invites,
     memberships,
     teams,
-    tournaments,
     hasher,
     tokens,
     bootstrapAdminCode: env.BOOTSTRAP_ADMIN_CODE,
   });
+
+  const tournamentService = makeTournamentService({ tournaments, memberships });
 
   const roster = makeRosterService({
     users,
@@ -141,6 +144,7 @@ export function buildContainer(env: Env): Container {
     services: {
       health: makeHealthService({ system }),
       auth,
+      tournaments: tournamentService,
       roster,
       schedule,
       lineups: lineupService,

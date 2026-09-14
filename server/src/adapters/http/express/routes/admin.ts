@@ -6,7 +6,9 @@ import type { ScheduleService } from "../../../../services/scheduleService.js";
 import type { ResultsService } from "../../../../services/resultsService.js";
 import type { PlayoffsService } from "../../../../services/playoffsService.js";
 import type { SuddenDeathService } from "../../../../services/suddenDeathService.js";
+import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
+import { makeResolveTournament } from "../middleware/tournament.js";
 import { asyncHandler } from "../asyncHandler.js";
 import { requireParam } from "../params.js";
 
@@ -31,6 +33,22 @@ const assignMemberSchema = z.object({
 const setCaptainSchema = z.object({ userId: z.string().min(1) });
 
 const positiveInt = z.number().int().positive();
+const createTournamentSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  config: z
+    .object({
+      teamCount: positiveInt,
+      teamSize: positiveInt,
+      pairSize: positiveInt,
+      pairsPerLineup: positiveInt,
+      roundsPerMatchup: positiveInt,
+      roundRobinCycles: positiveInt,
+      playoffQualifiers: positiveInt,
+      courtCount: positiveInt,
+    })
+    .partial()
+    .optional(),
+});
 const updateConfigSchema = z
   .object({
     teamCount: positiveInt,
@@ -73,10 +91,22 @@ export function adminRouter(
   results: ResultsService,
   playoffs: PlayoffsService,
   suddenDeath: SuddenDeathService,
+  tournaments: TournamentService,
   mw: AuthMiddleware,
 ): Router {
   const router = Router();
   router.use(mw.requireAdmin);
+
+  // --- Global admin (not tied to a single tournament) ---------------------
+
+  router.post(
+    "/tournaments",
+    asyncHandler(async (req, res) => {
+      const { name, config } = parse(createTournamentSchema, req.body);
+      const tournament = await tournaments.create(req.user!, { name, config });
+      res.status(201).json({ tournament });
+    }),
+  );
 
   router.get(
     "/users",
@@ -107,10 +137,14 @@ export function adminRouter(
     }),
   );
 
+  // --- Tournament-scoped admin (US28: every route below acts on the
+  //     active tournament resolved from the request) -----------------------
+  router.use(makeResolveTournament(tournaments));
+
   router.get(
     "/teams",
-    asyncHandler(async (_req, res) => {
-      res.json({ teams: await roster.listTeams() });
+    asyncHandler(async (req, res) => {
+      res.json({ teams: await roster.listTeams(req.tournamentId!) });
     }),
   );
 
@@ -118,22 +152,22 @@ export function adminRouter(
     "/teams",
     asyncHandler(async (req, res) => {
       const { name } = parse(createTeamSchema, req.body);
-      res.status(201).json({ team: await roster.createTeam(name) });
+      res.status(201).json({ team: await roster.createTeam(req.tournamentId!, name) });
     }),
   );
 
   router.delete(
     "/teams/:id",
     asyncHandler(async (req, res) => {
-      await roster.removeTeam(requireParam(req, "id"));
+      await roster.removeTeam(req.tournamentId!, requireParam(req, "id"));
       res.status(204).end();
     }),
   );
 
   router.post(
     "/teams/auto-balance",
-    asyncHandler(async (_req, res) => {
-      res.json({ teams: await roster.autoBalance() });
+    asyncHandler(async (req, res) => {
+      res.json({ teams: await roster.autoBalance(req.tournamentId!) });
     }),
   );
 
@@ -141,7 +175,7 @@ export function adminRouter(
     "/teams/:id/members",
     asyncHandler(async (req, res) => {
       const { userId, role } = parse(assignMemberSchema, req.body);
-      await roster.assignMember(userId, requireParam(req, "id"), role);
+      await roster.assignMember(req.tournamentId!, userId, requireParam(req, "id"), role);
       res.status(204).end();
     }),
   );
@@ -149,7 +183,7 @@ export function adminRouter(
   router.delete(
     "/teams/:id/members/:userId",
     asyncHandler(async (req, res) => {
-      await roster.removeMember(requireParam(req, "userId"));
+      await roster.removeMember(req.tournamentId!, requireParam(req, "userId"));
       res.status(204).end();
     }),
   );
@@ -158,7 +192,7 @@ export function adminRouter(
     "/teams/:id/captain",
     asyncHandler(async (req, res) => {
       const { userId } = parse(setCaptainSchema, req.body);
-      await roster.setCaptain(requireParam(req, "id"), userId);
+      await roster.setCaptain(req.tournamentId!, requireParam(req, "id"), userId);
       res.status(204).end();
     }),
   );
@@ -167,8 +201,8 @@ export function adminRouter(
 
   router.get(
     "/tournament/config",
-    asyncHandler(async (_req, res) => {
-      res.json({ config: await schedule.getConfig() });
+    asyncHandler(async (req, res) => {
+      res.json({ config: await schedule.getConfig(req.tournamentId!) });
     }),
   );
 
@@ -176,21 +210,21 @@ export function adminRouter(
     "/tournament/config",
     asyncHandler(async (req, res) => {
       const patch = parse(updateConfigSchema, req.body);
-      res.json({ config: await schedule.updateConfig(patch) });
+      res.json({ config: await schedule.updateConfig(req.tournamentId!, patch) });
     }),
   );
 
   router.post(
     "/schedule/generate",
-    asyncHandler(async (_req, res) => {
-      res.status(201).json({ schedule: await schedule.generate() });
+    asyncHandler(async (req, res) => {
+      res.status(201).json({ schedule: await schedule.generate(req.tournamentId!) });
     }),
   );
 
   router.post(
     "/schedule/reset",
-    asyncHandler(async (_req, res) => {
-      await schedule.reset();
+    asyncHandler(async (req, res) => {
+      await schedule.reset(req.tournamentId!);
       res.status(204).end();
     }),
   );
@@ -199,15 +233,15 @@ export function adminRouter(
     "/matchups/:id",
     asyncHandler(async (req, res) => {
       const { teamAId, teamBId } = parse(editMatchupSchema, req.body);
-      await schedule.editMatchup(requireParam(req, "id"), teamAId, teamBId);
+      await schedule.editMatchup(req.tournamentId!, requireParam(req, "id"), teamAId, teamBId);
       res.status(204).end();
     }),
   );
 
   router.get(
     "/courts",
-    asyncHandler(async (_req, res) => {
-      res.json({ courts: await schedule.listCourts() });
+    asyncHandler(async (req, res) => {
+      res.json({ courts: await schedule.listCourts(req.tournamentId!) });
     }),
   );
 
@@ -215,7 +249,7 @@ export function adminRouter(
     "/courts/:id",
     asyncHandler(async (req, res) => {
       const { label } = parse(renameCourtSchema, req.body);
-      res.json({ court: await schedule.renameCourt(requireParam(req, "id"), label) });
+      res.json({ court: await schedule.renameCourt(req.tournamentId!, requireParam(req, "id"), label) });
     }),
   );
 
@@ -225,16 +259,16 @@ export function adminRouter(
       const body = parse(editGameSchema, req.body);
       const gameId = requireParam(req, "id");
       if (body.scoreHome !== undefined && body.scoreAway !== undefined) {
-        await results.enterScore(req.user!, gameId, {
+        await results.enterScore(req.tournamentId!, req.user!, gameId, {
           scoreHome: body.scoreHome,
           scoreAway: body.scoreAway,
           ...(body.courtId ? { courtId: body.courtId } : {}),
         });
         // A decided semifinal/final may advance the bracket (create the final /
         // complete the tournament). Idempotent no-op during the round robin.
-        await playoffs.sync();
+        await playoffs.sync(req.tournamentId!);
       } else if (body.courtId) {
-        await schedule.reassignCourt(gameId, body.courtId);
+        await schedule.reassignCourt(req.tournamentId!, gameId, body.courtId);
       }
       res.status(204).end();
     }),
@@ -245,8 +279,8 @@ export function adminRouter(
   router.post(
     "/playoffs/seed",
     asyncHandler(async (req, res) => {
-      await playoffs.seed(req.user!);
-      res.status(201).json(await results.getResults(req.user!));
+      await playoffs.seed(req.tournamentId!, req.user!);
+      res.status(201).json(await results.getResults(req.tournamentId!, req.user!));
     }),
   );
 
@@ -254,8 +288,11 @@ export function adminRouter(
     "/matchups/:id/sudden-death",
     asyncHandler(async (req, res) => {
       const { scoreA, scoreB } = parse(suddenDeathResultSchema, req.body);
-      await suddenDeath.enterResult(req.user!, requireParam(req, "id"), { scoreA, scoreB });
-      await playoffs.sync();
+      await suddenDeath.enterResult(req.tournamentId!, req.user!, requireParam(req, "id"), {
+        scoreA,
+        scoreB,
+      });
+      await playoffs.sync(req.tournamentId!);
       res.status(204).end();
     }),
   );

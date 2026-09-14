@@ -39,9 +39,19 @@ export interface SuddenDeathState {
 }
 
 export interface SuddenDeathService {
-  getState(user: PublicUser, matchupId: string): Promise<SuddenDeathState>;
-  chooseRep(user: PublicUser, matchupId: string, args: { teamId: string; userId: string }): Promise<void>;
-  enterResult(user: PublicUser, matchupId: string, args: { scoreA: number; scoreB: number }): Promise<void>;
+  getState(tournamentId: string, user: PublicUser, matchupId: string): Promise<SuddenDeathState>;
+  chooseRep(
+    tournamentId: string,
+    user: PublicUser,
+    matchupId: string,
+    args: { teamId: string; userId: string },
+  ): Promise<void>;
+  enterResult(
+    tournamentId: string,
+    user: PublicUser,
+    matchupId: string,
+    args: { scoreA: number; scoreB: number },
+  ): Promise<void>;
 }
 
 export interface SuddenDeathServiceDeps {
@@ -56,8 +66,8 @@ export interface SuddenDeathServiceDeps {
 }
 
 export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeathService {
-  async function requireTournament(): Promise<TournamentDetail> {
-    const t = await deps.tournaments.getCurrentDetail();
+  async function requireTournament(tournamentId: string): Promise<TournamentDetail> {
+    const t = await deps.tournaments.getDetail(tournamentId);
     if (!t) throw new ValidationError("No tournament exists yet");
     return t;
   }
@@ -98,8 +108,8 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
   }
 
   return {
-    async getState(_user, matchupId) {
-      const t = await requireTournament();
+    async getState(tournamentId, _user, matchupId) {
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
       const [teamA, teamB, rosterA, rosterB, sd] = await Promise.all([
         deps.teams.findById(matchup.teamAId),
@@ -135,8 +145,8 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
       };
     },
 
-    async chooseRep(user, matchupId, { teamId, userId }) {
-      const t = await requireTournament();
+    async chooseRep(tournamentId, user, matchupId, { teamId, userId }) {
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
       await authorizeForTeam(user, matchup, teamId, t.id);
 
@@ -166,9 +176,9 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
       });
     },
 
-    async enterResult(user, matchupId, { scoreA, scoreB }) {
+    async enterResult(tournamentId, user, matchupId, { scoreA, scoreB }) {
       if (!user.isAdmin) throw new ForbiddenError("Only an admin can enter the sudden-death result");
-      const t = await requireTournament();
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
 
       if (!(await isTiedPlayoff(matchup, t))) {

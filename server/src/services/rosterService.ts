@@ -39,18 +39,23 @@ export interface RosterService {
   listUsers(): Promise<PublicUser[]>;
   setAdmin(userId: string, isAdmin: boolean): Promise<PublicUser>;
   createInvite(input: { grantsAdmin: boolean; expiresAt: Date | null }, createdBy: string): Promise<InviteRecord>;
-  listTeams(): Promise<TeamWithRoster[]>;
-  createTeam(name: string): Promise<TeamWithRoster>;
-  removeTeam(teamId: string): Promise<void>;
-  assignMember(userId: string, teamId: string, role?: MembershipRole): Promise<void>;
-  removeMember(userId: string): Promise<void>;
-  setCaptain(teamId: string, userId: string): Promise<void>;
-  autoBalance(): Promise<TeamWithRoster[]>;
+  listTeams(tournamentId: string): Promise<TeamWithRoster[]>;
+  createTeam(tournamentId: string, name: string): Promise<TeamWithRoster>;
+  removeTeam(tournamentId: string, teamId: string): Promise<void>;
+  assignMember(
+    tournamentId: string,
+    userId: string,
+    teamId: string,
+    role?: MembershipRole,
+  ): Promise<void>;
+  removeMember(tournamentId: string, userId: string): Promise<void>;
+  setCaptain(tournamentId: string, teamId: string, userId: string): Promise<void>;
+  autoBalance(tournamentId: string): Promise<TeamWithRoster[]>;
 }
 
 export function makeRosterService(deps: RosterServiceDeps): RosterService {
-  async function requireTournamentId(): Promise<string> {
-    const tournament = await deps.tournaments.getCurrent();
+  async function requireTournamentId(tournamentId: string): Promise<string> {
+    const tournament = await deps.tournaments.getDetail(tournamentId);
     if (!tournament) {
       throw new ValidationError("No tournament exists yet");
     }
@@ -94,22 +99,22 @@ export function makeRosterService(deps: RosterServiceDeps): RosterService {
       });
     },
 
-    async listTeams() {
-      const tournamentId = await requireTournamentId();
+    async listTeams(tournamentId) {
+      await requireTournamentId(tournamentId);
       const teams = await deps.teams.listByTournament(tournamentId);
       return Promise.all(teams.map((t) => rosterForTeam(t.id, t.name)));
     },
 
-    async createTeam(name) {
-      const tournamentId = await requireTournamentId();
+    async createTeam(tournamentId, name) {
+      await requireTournamentId(tournamentId);
       const existing = await deps.teams.findByName(tournamentId, name);
       if (existing) throw new ConflictError("A team with that name already exists");
       const team = await deps.teams.create(tournamentId, name);
       return { id: team.id, name: team.name, members: [] };
     },
 
-    async removeTeam(teamId) {
-      const tournament = await deps.tournaments.getCurrentDetail();
+    async removeTeam(tournamentId, teamId) {
+      const tournament = await deps.tournaments.getDetail(tournamentId);
       if (!tournament) throw new ValidationError("No tournament exists yet");
       const team = await deps.teams.findById(teamId);
       if (!team || team.tournamentId !== tournament.id) throw new NotFoundError("Team not found");
@@ -127,8 +132,8 @@ export function makeRosterService(deps: RosterServiceDeps): RosterService {
       });
     },
 
-    async assignMember(userId, teamId, role = "member") {
-      const tournamentId = await requireTournamentId();
+    async assignMember(tournamentId, userId, teamId, role = "member") {
+      await requireTournamentId(tournamentId);
       const user = await deps.users.findById(userId);
       if (!user) throw new NotFoundError("User not found");
       const team = await deps.teams.findById(teamId);
@@ -142,13 +147,13 @@ export function makeRosterService(deps: RosterServiceDeps): RosterService {
       });
     },
 
-    async removeMember(userId) {
-      const tournamentId = await requireTournamentId();
+    async removeMember(tournamentId, userId) {
+      await requireTournamentId(tournamentId);
       await deps.memberships.removeByUserAndTournament(userId, tournamentId);
     },
 
-    async setCaptain(teamId, userId) {
-      const tournamentId = await requireTournamentId();
+    async setCaptain(tournamentId, teamId, userId) {
+      await requireTournamentId(tournamentId);
       const team = await deps.teams.findById(teamId);
       if (!team || team.tournamentId !== tournamentId) throw new NotFoundError("Team not found");
       const membership = await deps.memberships.findByUserAndTournament(userId, tournamentId);
@@ -161,8 +166,8 @@ export function makeRosterService(deps: RosterServiceDeps): RosterService {
       });
     },
 
-    async autoBalance() {
-      const tournamentId = await requireTournamentId();
+    async autoBalance(tournamentId) {
+      await requireTournamentId(tournamentId);
       const teams = await deps.teams.listByTournament(tournamentId);
       if (teams.length === 0) throw new ValidationError("Create teams before auto-balancing");
 

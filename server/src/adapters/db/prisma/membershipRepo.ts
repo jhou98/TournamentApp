@@ -8,6 +8,12 @@ export function makePrismaMembershipRepo(): MembershipRepo {
         where: { userId_tournamentId: { userId, tournamentId } },
       });
     },
+    async listByUser(userId) {
+      return getDb().membership.findMany({
+        where: { userId },
+        orderBy: { createdAt: "asc" },
+      });
+    },
     async listByTeam(teamId) {
       return getDb().membership.findMany({
         where: { teamId },

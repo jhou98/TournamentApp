@@ -115,11 +115,19 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
   let pairSeq = 0;
 
   const tournaments: TournamentRepo = {
-    async getCurrent() {
-      return { id: TID, name: "Test" };
+    async getDetail(id) {
+      return id === TID ? { ...stores.tournament } : null;
     },
-    async getCurrentDetail() {
-      return { ...stores.tournament };
+    async list() {
+      const { id, name, status } = stores.tournament;
+      return [{ id, name, status }];
+    },
+    async listByIds(ids) {
+      const { id, name, status } = stores.tournament;
+      return ids.includes(id) ? [{ id, name, status }] : [];
+    },
+    async create() {
+      throw new Error("not used");
     },
     async setStatus() {
       throw new Error("not used");
@@ -195,6 +203,9 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
   const memberships: MembershipRepo = {
     async findByUserAndTournament(userId, tid) {
       return stores.memberships.find((m) => m.userId === userId && m.tournamentId === tid) ?? null;
+    },
+    async listByUser(userId) {
+      return stores.memberships.filter((m) => m.userId === userId);
     },
     async listByTeam(teamId) {
       return stores.memberships.filter((m) => m.teamId === teamId);
@@ -371,18 +382,18 @@ const asUser = (id: string, isAdmin = false): PublicUser => ({
 
 async function submitBoth(service: LineupService, stores: Stores, roundNo = 1) {
   const [aPairs, bPairs] = roundNo === 1 ? [A_PAIRS, B_PAIRS] : [A_PAIRS2, B_PAIRS2];
-  await service.submit(asUser("ca"), { matchupId: MID, teamId: TA, roundNo, pairs: aPairs });
-  await service.submit(asUser("cb"), { matchupId: MID, teamId: TB, roundNo, pairs: bPairs });
+  await service.submit(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo, pairs: aPairs });
+  await service.submit(TID, asUser("cb"), { matchupId: MID, teamId: TB, roundNo, pairs: bPairs });
 }
 
 /** Submit + lock every lineup (both teams, both rounds); returns the last lock. */
 async function lockEverything(service: LineupService, stores: Stores) {
   await submitBoth(service, stores, 1);
   await submitBoth(service, stores, 2);
-  await service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
-  await service.lock(asUser("cb"), { matchupId: MID, teamId: TB, roundNo: 1 });
-  await service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 2 });
-  return service.lock(asUser("cb"), { matchupId: MID, teamId: TB, roundNo: 2 });
+  await service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
+  await service.lock(TID, asUser("cb"), { matchupId: MID, teamId: TB, roundNo: 1 });
+  await service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 2 });
+  return service.lock(TID, asUser("cb"), { matchupId: MID, teamId: TB, roundNo: 2 });
 }
 
 describe("lineupService.submit", () => {
@@ -395,7 +406,7 @@ describe("lineupService.submit", () => {
   });
 
   it("lets a captain submit a valid lineup, unlocked", async () => {
-    const lineup = await service.submit(asUser("ca"), {
+    const lineup = await service.submit(TID, asUser("ca"), {
       matchupId: MID,
       teamId: TA,
       roundNo: 1,
@@ -408,19 +419,19 @@ describe("lineupService.submit", () => {
 
   it("rejects a non-captain of the team", async () => {
     await expect(
-      service.submit(asUser("a1"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS }),
+      service.submit(TID, asUser("a1"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("rejects the opposing team's captain acting on the other side", async () => {
     await expect(
-      service.submit(asUser("cb"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS }),
+      service.submit(TID, asUser("cb"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("rejects an invalid lineup (player not on the roster)", async () => {
     await expect(
-      service.submit(asUser("ca"), {
+      service.submit(TID, asUser("ca"), {
         matchupId: MID,
         teamId: TA,
         roundNo: 1,
@@ -430,22 +441,22 @@ describe("lineupService.submit", () => {
   });
 
   it("rejects reusing a pairing from another round of the same matchup", async () => {
-    await service.submit(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS });
+    await service.submit(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS });
     await expect(
-      service.submit(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 2, pairs: A_PAIRS }),
+      service.submit(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 2, pairs: A_PAIRS }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("refuses to edit a locked lineup", async () => {
-    await service.submit(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS });
-    await service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
+    await service.submit(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS });
+    await service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
     await expect(
-      service.submit(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS }),
+      service.submit(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1, pairs: A_PAIRS }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("lets an admin submit on a team's behalf", async () => {
-    const lineup = await service.submit(asUser("admin1", true), {
+    const lineup = await service.submit(TID, asUser("admin1", true), {
       matchupId: MID,
       teamId: TA,
       roundNo: 1,
@@ -468,9 +479,9 @@ describe("lineupService.lock + random assignment", () => {
     await submitBoth(service, stores, 1);
     await submitBoth(service, stores, 2);
     // Lock everything except team B's round 2 — still no assignment (anti-leak).
-    await service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
-    await service.lock(asUser("cb"), { matchupId: MID, teamId: TB, roundNo: 1 });
-    const third = await service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 2 });
+    await service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
+    await service.lock(TID, asUser("cb"), { matchupId: MID, teamId: TB, roundNo: 1 });
+    const third = await service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 2 });
     expect(third.assigned).toBe(false);
     expect(stores.games.every((g) => g.status === "awaiting_lineups")).toBe(true);
   });
@@ -489,7 +500,7 @@ describe("lineupService.lock + random assignment", () => {
 
   it("requires a submitted lineup before locking", async () => {
     await expect(
-      service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 }),
+      service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 });
@@ -506,25 +517,25 @@ describe("lineupService.reshuffle", () => {
   it("re-randomizes a fully-locked matchup (admin only)", async () => {
     await lockEverything(service, stores);
     // Should not throw; games stay assigned with pairs filled.
-    await service.reshuffle(asUser("admin1", true), MID);
+    await service.reshuffle(TID, asUser("admin1", true), MID);
     expect(stores.games.every((g) => g.status === "assigned" && g.homePairId && g.awayPairId)).toBe(true);
   });
 
   it("rejects a non-admin", async () => {
     await lockEverything(service, stores);
-    await expect(service.reshuffle(asUser("ca"), MID)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(service.reshuffle(TID, asUser("ca"), MID)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("refuses before all lineups are locked", async () => {
     await submitBoth(service, stores, 1);
-    await service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
-    await expect(service.reshuffle(asUser("admin1", true), MID)).rejects.toBeInstanceOf(ConflictError);
+    await service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
+    await expect(service.reshuffle(TID, asUser("admin1", true), MID)).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("refuses once a game is final", async () => {
     await lockEverything(service, stores);
     stores.games[0]!.status = "final";
-    await expect(service.reshuffle(asUser("admin1", true), MID)).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.reshuffle(TID, asUser("admin1", true), MID)).rejects.toBeInstanceOf(ConflictError);
   });
 });
 
@@ -540,7 +551,7 @@ describe("lineupService.unlock", () => {
   it("clears only the unlocked round's assignment (admin only)", async () => {
     await lockEverything(service, stores);
 
-    await service.unlock(asUser("admin1", true), { matchupId: MID, teamId: TA, roundNo: 1 });
+    await service.unlock(TID, asUser("admin1", true), { matchupId: MID, teamId: TA, roundNo: 1 });
 
     expect(stores.lineups.find((l) => l.teamId === TA && l.roundNo === 1)!.locked).toBe(false);
     expect(stores.games.filter((g) => g.roundNo === 1).every((g) => g.status === "awaiting_lineups")).toBe(
@@ -554,7 +565,7 @@ describe("lineupService.unlock", () => {
   it("rejects a non-admin", async () => {
     await lockEverything(service, stores);
     await expect(
-      service.unlock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 }),
+      service.unlock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
@@ -564,9 +575,9 @@ describe("lineupService.getContext", () => {
     const stores = freshStores();
     const service = buildService(stores, () => 0);
     await submitBoth(service, stores);
-    await service.lock(asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
+    await service.lock(TID, asUser("ca"), { matchupId: MID, teamId: TA, roundNo: 1 });
 
-    const ctx = await service.getContext(asUser("ca"), MID);
+    const ctx = await service.getContext(TID, asUser("ca"), MID);
     const round1 = ctx.rounds.find((r) => r.roundNo === 1)!;
     expect(round1.teamA.pairs).not.toBeNull(); // own side visible
     expect(round1.teamB.pairs).toBeNull(); // opponent hidden pre-reveal
@@ -579,7 +590,7 @@ describe("lineupService.getContext", () => {
     const service = buildService(stores, () => 0);
     await lockEverything(service, stores);
 
-    const ctx = await service.getContext(asUser("ca"), MID);
+    const ctx = await service.getContext(TID, asUser("ca"), MID);
     const round1 = ctx.rounds.find((r) => r.roundNo === 1)!;
     expect(round1.revealed).toBe(true);
     expect(round1.teamB.pairs).not.toBeNull();
@@ -593,7 +604,7 @@ describe("lineupService.getContext", () => {
   it("lists a captain's own matchups", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    const mine = await service.listMyMatchups(asUser("ca"));
+    const mine = await service.listMyMatchups(TID, asUser("ca"));
     expect(mine).toHaveLength(1);
     expect(mine[0]!.myTeamId).toBe(TA);
   });

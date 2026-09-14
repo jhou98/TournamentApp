@@ -98,14 +98,19 @@ export interface EnterScoreInput {
 }
 
 export interface ResultsService {
-  enterScore(user: PublicUser, gameId: string, input: EnterScoreInput): Promise<void>;
-  getResults(user: PublicUser): Promise<ResultsView>;
-  getStandings(): Promise<StandingsView>;
+  enterScore(
+    tournamentId: string,
+    user: PublicUser,
+    gameId: string,
+    input: EnterScoreInput,
+  ): Promise<void>;
+  getResults(tournamentId: string, user: PublicUser): Promise<ResultsView>;
+  getStandings(tournamentId: string): Promise<StandingsView>;
 }
 
 export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
-  async function requireTournament(): Promise<TournamentDetail> {
-    const t = await deps.tournaments.getCurrentDetail();
+  async function requireTournament(tournamentId: string): Promise<TournamentDetail> {
+    const t = await deps.tournaments.getDetail(tournamentId);
     if (!t) throw new ValidationError("No tournament exists yet");
     return t;
   }
@@ -150,9 +155,9 @@ export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
   }
 
   return {
-    async enterScore(user, gameId, input) {
+    async enterScore(tournamentId, user, gameId, input) {
       if (!user.isAdmin) throw new ConflictError("Only an admin can enter scores");
-      const t = await requireTournament();
+      const t = await requireTournament(tournamentId);
 
       const game = await deps.games.findById(gameId);
       if (!game) throw new NotFoundError("Game not found");
@@ -195,8 +200,8 @@ export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
       });
     },
 
-    async getResults(user) {
-      const t = await requireTournament();
+    async getResults(tournamentId, user) {
+      const t = await requireTournament(tournamentId);
       const [matchupViews, courts, names] = await Promise.all([
         deps.matchups.listByTournament(t.id),
         deps.courts.listByTournament(t.id),
@@ -282,8 +287,8 @@ export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
       return { status: t.status, isAdmin: user.isAdmin, matchups };
     },
 
-    async getStandings() {
-      const t = await requireTournament();
+    async getStandings(tournamentId) {
+      const t = await requireTournament(tournamentId);
       const [teams, matchupViews, games] = await Promise.all([
         deps.teams.listByTournament(t.id),
         deps.matchups.listByTournament(t.id),

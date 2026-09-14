@@ -95,11 +95,19 @@ function finishedRoundRobin(): Stores {
 
 function buildService(stores: Stores): PlayoffsService {
   const tournaments: TournamentRepo = {
-    async getCurrent() {
-      return { id: TID, name: "Test" };
+    async getDetail(id) {
+      return id === TID ? { ...stores.tournament } : null;
     },
-    async getCurrentDetail() {
-      return { ...stores.tournament };
+    async list() {
+      const { id, name, status } = stores.tournament;
+      return [{ id, name, status }];
+    },
+    async listByIds(ids) {
+      const { id, name, status } = stores.tournament;
+      return ids.includes(id) ? [{ id, name, status }] : [];
+    },
+    async create() {
+      throw new Error("not used");
     },
     async setStatus(_id, status) {
       stores.tournament.status = status;
@@ -253,7 +261,7 @@ describe("playoffsService.seed", () => {
   });
 
   it("seeds #1v#4 and #2v#3 from final standings and moves to playoffs", async () => {
-    await service.seed(admin);
+    await service.seed(TID, admin);
     const semis = stores.matchups.filter((m) => m.stage === "semifinal");
     expect(semis).toHaveLength(2);
     const sf1 = semis.find((m) => m.bracketSlot === "SF1")!;
@@ -269,7 +277,7 @@ describe("playoffsService.seed", () => {
 
   it("refuses to seed until every round-robin game is final", async () => {
     stores.games[0]!.status = "assigned";
-    await expect(service.seed(admin)).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.seed(TID, admin)).rejects.toBeInstanceOf(ConflictError);
   });
 });
 
@@ -285,14 +293,14 @@ describe("playoffsService.sync", () => {
   });
 
   it("creates the final once both semifinals are decided", async () => {
-    await service.seed(admin);
+    await service.seed(TID, admin);
     // Decide both semifinals.
     for (const slot of ["SF1", "SF2"]) {
       const sf = stores.matchups.find((m) => m.bracketSlot === slot)!;
       sf.status = "final";
       sf.winnerTeamId = sf.teamAId; // higher seed wins
     }
-    await service.sync();
+    await service.sync(TID);
     const final = stores.matchups.find((m) => m.stage === "final");
     expect(final).toBeTruthy();
     expect([final!.teamAId, final!.teamBId]).toEqual(["A", "B"]);
@@ -300,38 +308,38 @@ describe("playoffsService.sync", () => {
   });
 
   it("completes the tournament once the final is decided", async () => {
-    await service.seed(admin);
+    await service.seed(TID, admin);
     for (const slot of ["SF1", "SF2"]) {
       const sf = stores.matchups.find((m) => m.bracketSlot === slot)!;
       sf.status = "final";
       sf.winnerTeamId = sf.teamAId;
     }
-    await service.sync(); // creates final
+    await service.sync(TID); // creates final
     const final = stores.matchups.find((m) => m.stage === "final")!;
     final.status = "final";
     final.winnerTeamId = "A";
-    await service.sync();
+    await service.sync(TID);
     expect(stores.tournament.status).toBe("completed");
   });
 
   it("re-opens a completed tournament if the final is edited back to undecided", async () => {
-    await service.seed(admin);
+    await service.seed(TID, admin);
     for (const slot of ["SF1", "SF2"]) {
       const sf = stores.matchups.find((m) => m.bracketSlot === slot)!;
       sf.status = "final";
       sf.winnerTeamId = sf.teamAId;
     }
-    await service.sync();
+    await service.sync(TID);
     const final = stores.matchups.find((m) => m.stage === "final")!;
     final.status = "final";
     final.winnerTeamId = "A";
-    await service.sync();
+    await service.sync(TID);
     expect(stores.tournament.status).toBe("completed");
 
     // Final edited to a tie: no winner, matchup back to in_progress.
     final.status = "in_progress";
     final.winnerTeamId = null;
-    await service.sync();
+    await service.sync(TID);
     expect(stores.tournament.status).toBe("playoffs");
   });
 });

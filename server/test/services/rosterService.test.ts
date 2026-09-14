@@ -36,11 +36,17 @@ function tournamentDetail(): TournamentDetail {
 }
 
 const currentTournament: TournamentRepo = {
-  async getCurrent() {
-    return { id: TID, name: "Test" };
+  async getDetail(id) {
+    return id === TID ? tournamentDetail() : null;
   },
-  async getCurrentDetail() {
-    return tournamentDetail();
+  async list() {
+    return [{ id: TID, name: "Test", status: currentStatus }];
+  },
+  async listByIds(ids) {
+    return ids.includes(TID) ? [{ id: TID, name: "Test", status: currentStatus }] : [];
+  },
+  async create() {
+    throw new Error("not used");
   },
   async setStatus() {
     throw new Error("not used");
@@ -107,6 +113,9 @@ function fakeMemberships(): MembershipRepo & { store: MembershipRecord[] } {
     async findByUserAndTournament(userId, tournamentId) {
       return index.get(key(userId, tournamentId)) ?? null;
     },
+    async listByUser(userId) {
+      return store.filter((m) => m.userId === userId);
+    },
     async listByTeam(teamId) {
       return store.filter((m) => m.teamId === teamId);
     },
@@ -172,13 +181,13 @@ describe("rosterService.setCaptain", () => {
     const memberships = fakeMemberships();
     const roster = build(users, teams, memberships);
 
-    await roster.assignMember("a", "team1");
-    await roster.assignMember("b", "team1");
+    await roster.assignMember(TID, "a", "team1");
+    await roster.assignMember(TID, "b", "team1");
 
-    await roster.setCaptain("team1", "a");
+    await roster.setCaptain(TID, "team1", "a");
     expect(memberships.store.find((m) => m.userId === "a")!.role).toBe("captain");
 
-    await roster.setCaptain("team1", "b");
+    await roster.setCaptain(TID, "team1", "b");
     expect(memberships.store.find((m) => m.userId === "b")!.role).toBe("captain");
     expect(memberships.store.find((m) => m.userId === "a")!.role).toBe("member");
   });
@@ -188,7 +197,7 @@ describe("rosterService.setCaptain", () => {
     const teams = fakeTeams([{ id: "team1", tournamentId: TID, name: "Alpha", createdAt: new Date() }]);
     const memberships = fakeMemberships();
     const roster = build(users, teams, memberships);
-    await expect(roster.setCaptain("team1", "a")).rejects.toBeInstanceOf(ValidationError);
+    await expect(roster.setCaptain(TID, "team1", "a")).rejects.toBeInstanceOf(ValidationError);
   });
 });
 
@@ -197,7 +206,7 @@ describe("rosterService.createTeam", () => {
     const users = fakeUsers([]);
     const teams = fakeTeams([{ id: "team1", tournamentId: TID, name: "Alpha", createdAt: new Date() }]);
     const roster = build(users, teams, fakeMemberships());
-    await expect(roster.createTeam("Alpha")).rejects.toBeInstanceOf(ConflictError);
+    await expect(roster.createTeam(TID, "Alpha")).rejects.toBeInstanceOf(ConflictError);
   });
 });
 
@@ -211,10 +220,10 @@ describe("rosterService.removeTeam", () => {
     ]);
     const memberships = fakeMemberships();
     const roster = build(users, teams, memberships);
-    await roster.assignMember("a", "team1");
-    await roster.assignMember("b", "team1");
+    await roster.assignMember(TID, "a", "team1");
+    await roster.assignMember(TID, "b", "team1");
 
-    await roster.removeTeam("team1");
+    await roster.removeTeam(TID, "team1");
 
     expect(await teams.findById("team1")).toBeNull();
     expect(memberships.store.filter((m) => m.teamId === "team1")).toHaveLength(0);
@@ -224,7 +233,7 @@ describe("rosterService.removeTeam", () => {
     currentStatus = "round_robin";
     const teams = fakeTeams([{ id: "team1", tournamentId: TID, name: "Alpha", createdAt: new Date() }]);
     const roster = build(fakeUsers([]), teams, fakeMemberships());
-    await expect(roster.removeTeam("team1")).rejects.toBeInstanceOf(ConflictError);
+    await expect(roster.removeTeam(TID, "team1")).rejects.toBeInstanceOf(ConflictError);
     currentStatus = "setup";
   });
 });
@@ -239,7 +248,7 @@ describe("rosterService.autoBalance", () => {
     const memberships = fakeMemberships();
     const roster = build(users, teams, memberships);
 
-    const result = await roster.autoBalance();
+    const result = await roster.autoBalance(TID);
 
     const assigned = memberships.store.map((m) => m.userId);
     expect(assigned).not.toContain("boss");

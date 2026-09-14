@@ -8,7 +8,6 @@ import {
   type PublicUser,
   type TeamRepo,
   type TokenService,
-  type TournamentRepo,
   type UserRepo,
 } from "../ports/index.js";
 
@@ -33,6 +32,8 @@ export interface AuthResult {
 export interface MeProfile {
   user: PublicUser;
   role: AppRole;
+  /** The active tournament this profile was resolved for (US28), or null. */
+  tournamentId: string | null;
   team: { id: string; name: string } | null;
   captain: { id: string; username: string; displayName: string } | null;
 }
@@ -42,7 +43,6 @@ export interface AuthServiceDeps {
   invites: InviteRepo;
   memberships: MembershipRepo;
   teams: TeamRepo;
-  tournaments: TournamentRepo;
   hasher: PasswordHasher;
   tokens: TokenService;
   bootstrapAdminCode: string;
@@ -51,15 +51,13 @@ export interface AuthServiceDeps {
 export interface AuthService {
   signup(cmd: SignupCommand): Promise<AuthResult>;
   login(cmd: LoginCommand): Promise<AuthResult>;
-  me(userId: string): Promise<MeProfile>;
+  me(userId: string, tournamentId: string | null): Promise<MeProfile>;
 }
 
 export function makeAuthService(deps: AuthServiceDeps): AuthService {
-  async function currentMembershipRole(userId: string) {
-    const tournament = await deps.tournaments.getCurrent();
-    if (!tournament) return { tournamentId: null, membership: null };
-    const membership = await deps.memberships.findByUserAndTournament(userId, tournament.id);
-    return { tournamentId: tournament.id, membership };
+  async function membershipInTournament(userId: string, tournamentId: string | null) {
+    if (!tournamentId) return null;
+    return deps.memberships.findByUserAndTournament(userId, tournamentId);
   }
 
   return {
@@ -117,21 +115,22 @@ export function makeAuthService(deps: AuthServiceDeps): AuthService {
         throw new UnauthorizedError("Invalid username or password");
       }
 
-      const { membership } = await currentMembershipRole(user.id);
+      // Login doesn't yet know which tournament is active — role there is refined
+      // per active tournament by `me` (US28). Admin is admin everywhere.
       return {
         user: toPublicUser(user),
         token: deps.tokens.sign({ userId: user.id }),
-        role: deriveRole(user.isAdmin, membership?.role ?? null),
+        role: deriveRole(user.isAdmin, null),
       };
     },
 
-    async me(userId) {
+    async me(userId, tournamentId) {
       const user = await deps.users.findById(userId);
       if (!user) {
         throw new UnauthorizedError("User no longer exists");
       }
 
-      const { membership } = await currentMembershipRole(userId);
+      const membership = await membershipInTournament(userId, tournamentId);
 
       let team: MeProfile["team"] = null;
       let captain: MeProfile["captain"] = null;
@@ -158,6 +157,7 @@ export function makeAuthService(deps: AuthServiceDeps): AuthService {
       return {
         user: toPublicUser(user),
         role: deriveRole(user.isAdmin, membership?.role ?? null),
+        tournamentId,
         team,
         captain,
       };

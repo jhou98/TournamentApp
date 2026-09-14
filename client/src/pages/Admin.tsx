@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { AdminSchedule } from "./AdminSchedule";
 
 interface AdminUser {
@@ -23,9 +24,11 @@ interface TeamRoster {
 }
 
 export function Admin() {
+  const { tournaments, activeTournamentId, setActiveTournament, refresh } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [teams, setTeams] = useState<TeamRoster[]>([]);
   const [newTeam, setNewTeam] = useState("");
+  const [newTournament, setNewTournament] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -42,9 +45,27 @@ export function Admin() {
     }
   }
 
+  // Reload the roster whenever the active tournament changes — everything below
+  // is scoped to it (US28).
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTournamentId]);
+
+  async function createTournament() {
+    setError(null);
+    try {
+      const { tournament } = await api<{ tournament: { id: string } }>("/admin/tournaments", {
+        method: "POST",
+        body: JSON.stringify({ name: newTournament.trim() }),
+      });
+      setNewTournament("");
+      await refresh(); // pull the new tournament into the accessible list
+      await setActiveTournament(tournament.id); // and switch to it
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create tournament");
+    }
+  }
 
   async function run(fn: () => Promise<unknown>) {
     setError(null);
@@ -63,6 +84,32 @@ export function Admin() {
     <div style={{ maxWidth: 820, margin: "1.5rem auto" }}>
       <h1>Admin — Roster</h1>
       {error && <p style={{ color: "crimson" }}>{error}</p>}
+
+      <section style={{ marginBottom: 24 }}>
+        <h2>Tournaments</h2>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input
+            placeholder="New tournament name"
+            value={newTournament}
+            onChange={(e) => setNewTournament(e.target.value)}
+          />
+          <button onClick={() => createTournament()} disabled={!newTournament.trim()}>
+            Create tournament
+          </button>
+        </div>
+        {tournaments.map((t) => (
+          <div key={t.id} style={cardStyle}>
+            <strong>{t.name}</strong> — {t.status}
+            {t.id === activeTournamentId ? (
+              <span style={{ marginLeft: 8, color: "green" }}>active</span>
+            ) : (
+              <button style={miniBtn} onClick={() => setActiveTournament(t.id)}>
+                make active
+              </button>
+            )}
+          </div>
+        ))}
+      </section>
 
       <section style={{ marginBottom: 24 }}>
         <h2>Teams</h2>

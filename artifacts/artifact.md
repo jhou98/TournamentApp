@@ -4,10 +4,30 @@
 > (foundation + health), Part 1 (auth, roster, captains — US1–US3), Part 2
 > (round-robin schedule generation + court assignment — US4–US5), Part 3
 > (captain lineups, validation, random pair assignment — US6–US8), Part 4
-> (match scoring + standings/seeding — US9–US10), and Part 5 (playoffs, sudden
-> death — US11–US12) have landed. **Phase 0 is complete except the backlog story
-> US28** (multi-tournament / per-tournament coins), to pick up before Phase 1.
-> Owner: @jhou98. Last updated: 2026-09-13.
+> (match scoring + standings/seeding — US9–US10), Part 5 (playoffs, sudden
+> death — US11–US12), and Part 6 (multi-tournament + per-tournament access —
+> **US28**, minus the coin-reset piece deferred with the rest of the economy)
+> have landed. **Phase 0 is complete.** Next up: Phase 1 (economy). Owner:
+> @jhou98. Last updated: 2026-09-13.
+>
+> **Changelog (2026-09-13) — Part 6:** **US28 (multi-tournament) shipped**, scoped
+> to what Phase 0 covers (teams, schedule, scores, results, standings, playoffs) —
+> the **coin-reset minimum bar is intentionally deferred to Phase 1** with the rest of
+> the economy (coins aren't built yet). The single-tournament `findFirst` is gone:
+> a new **`TournamentService`** resolves the **active tournament per request** and
+> gates access — a new **`resolveTournament` middleware** reads an `X-Tournament-Id`
+> header (falls back to a `?tournament=` query, then to the caller's sole tournament),
+> and every scoped service method now takes an explicit `tournamentId` (compiler-checked
+> across all call sites). **Access:** admins see all tournaments; everyone else sees only
+> the ones they're rostered in (via `MembershipRepo.listByUser`) — requesting one you're
+> not in is a 404, and `/api/me`'s role is now resolved **per active tournament**. New
+> routes: **`GET /api/tournaments`** (accessible list) and **`POST /api/admin/tournaments`**
+> (create from `DEFAULT_TOURNAMENT_CONFIG`, shared with the seed). **Client:** the active
+> id rides an `X-Tournament-Id` header (localStorage-backed), a nav **tournament switcher**,
+> an Admin **Tournaments** section (create + activate), and routed pages remount on switch
+> so per-tournament data refetches. **No schema change / no migration** — every scoped table
+> already carried `tournament_id`. Verified end-to-end: per-tournament roster isolation,
+> membership-gated access (404 for non-members), and admin-only guards (403).
 >
 > **Changelog (2026-09-13) — Part 5:** US11–US12 shipped, plus a matchup-matching
 > fix. **Playoffs (US11):** `POST /api/admin/playoffs/seed` seeds the bracket from final
@@ -126,7 +146,7 @@ random matchups → results → standings → playoffs, not the UI). **P1 = econ
 | US10 | Standings track team record, games won/lost, **game differential**, ranking; auto-rank by **record → differential → tiebreaker**; final standings seed playoffs |
 | US11 | **Playoffs:** semifinals **#1 vs #4** and **#2 vs #3**, each two rounds of 3 doubles (new pairs + random matchups per round); most total wins advances; **finals** use the same format and declare the champion |
 | US12 | **Sudden death** on a **3–3** playoff/final: captain picks one eligible representative, admin enters the result separately (**1v1, first to 5, win by 2, cap 7**); winner advances |
-| US28 | **Multi-tournament + per-tournament access:** admin creates and manages **multiple tournaments**, each with its own config, teams, schedule, results, standings, **and coin ledger**; a signed-in user sees only the tournaments whose team they belong to (admins see all), and picks the active one; **all data — including coins/economy — is scoped by `tournament_id`** so nothing (least of all balances) bleeds across events. **Minimum bar:** even before full per-event scoping lands, an admin can **reset all coin balances for a tournament** so a new event starts clean |
+| US28 | **Multi-tournament + per-tournament access:** admin creates and manages **multiple tournaments**, each with its own config, teams, schedule, results, standings, **and coin ledger**; a signed-in user sees only the tournaments whose team they belong to (admins see all), and picks the active one; **all data — including coins/economy — is scoped by `tournament_id`** so nothing (least of all balances) bleeds across events. **Minimum bar:** even before full per-event scoping lands, an admin can **reset all coin balances for a tournament** so a new event starts clean. **✅ Shipped (Part 6):** multi-tournament CRUD + per-request active-tournament resolution + membership-based access + `tournament_id` scoping across all Phase-0 data. **Deferred to Phase 1:** the coin ledger scoping + coin-reset, which land with the economy (coins aren't built yet). |
 
 ### P1 — Economy (Phase 1)
 

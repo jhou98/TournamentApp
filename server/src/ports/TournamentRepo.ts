@@ -5,6 +5,11 @@ export interface TournamentRef {
 
 export type TournamentStatus = "setup" | "round_robin" | "playoffs" | "completed";
 
+/** A tournament shown in a picker: identity + current status. */
+export interface TournamentSummary extends TournamentRef {
+  status: TournamentStatus;
+}
+
 /** The editable numeric shape of the tournament (rules JSON is handled elsewhere). */
 export interface TournamentConfig {
   teamCount: number;
@@ -21,11 +26,22 @@ export interface TournamentDetail extends TournamentRef, TournamentConfig {
   status: TournamentStatus;
 }
 
+/** Everything needed to create a tournament row (config + the rules JSON blobs). */
+export interface NewTournament extends TournamentConfig {
+  name: string;
+  coinRule: unknown;
+  streakRule: unknown;
+  suddenDeathRule: unknown;
+}
+
 export interface TournamentRepo {
-  /** The single active tournament (Part 0 seeds one; D6 = one tournament for now). */
-  getCurrent(): Promise<TournamentRef | null>;
-  /** Full config + status of the active tournament. */
-  getCurrentDetail(): Promise<TournamentDetail | null>;
+  /** Full config + status of one tournament (US28 — resolved per request). */
+  getDetail(id: string): Promise<TournamentDetail | null>;
+  /** All tournaments (admins see every one). */
+  list(): Promise<TournamentSummary[]>;
+  /** Summaries for a specific set of ids (a non-admin's accessible tournaments). */
+  listByIds(ids: string[]): Promise<TournamentSummary[]>;
+  create(input: NewTournament): Promise<TournamentDetail>;
   setStatus(id: string, status: TournamentStatus): Promise<void>;
   updateConfig(id: string, patch: Partial<TournamentConfig>): Promise<TournamentDetail>;
 }

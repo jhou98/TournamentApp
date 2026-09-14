@@ -106,26 +106,28 @@ export interface SubmitLineupInput {
 }
 
 export interface LineupService {
-  listMyMatchups(user: PublicUser): Promise<MyMatchupView[]>;
-  getContext(user: PublicUser, matchupId: string): Promise<LineupContext>;
-  submit(user: PublicUser, input: SubmitLineupInput): Promise<LineupWithPairs>;
+  listMyMatchups(tournamentId: string, user: PublicUser): Promise<MyMatchupView[]>;
+  getContext(tournamentId: string, user: PublicUser, matchupId: string): Promise<LineupContext>;
+  submit(tournamentId: string, user: PublicUser, input: SubmitLineupInput): Promise<LineupWithPairs>;
   lock(
+    tournamentId: string,
     user: PublicUser,
     args: { matchupId: string; teamId: string; roundNo: number },
   ): Promise<{ locked: boolean; assigned: boolean }>;
   unlock(
+    tournamentId: string,
     user: PublicUser,
     args: { matchupId: string; teamId: string; roundNo: number },
   ): Promise<void>;
   /** Admin re-randomizes home↔away pairings on the locked lineups (US8/D12). */
-  reshuffle(user: PublicUser, matchupId: string): Promise<void>;
+  reshuffle(tournamentId: string, user: PublicUser, matchupId: string): Promise<void>;
 }
 
 export function makeLineupService(deps: LineupServiceDeps): LineupService {
   const rng = deps.rng ?? Math.random;
 
-  async function requireTournament(): Promise<TournamentDetail> {
-    const t = await deps.tournaments.getCurrentDetail();
+  async function requireTournament(tournamentId: string): Promise<TournamentDetail> {
+    const t = await deps.tournaments.getDetail(tournamentId);
     if (!t) throw new ValidationError("No tournament exists yet");
     return t;
   }
@@ -249,8 +251,8 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
   }
 
   return {
-    async listMyMatchups(user) {
-      const t = await requireTournament();
+    async listMyMatchups(tournamentId, user) {
+      const t = await requireTournament(tournamentId);
       const all = await deps.matchups.listByTournament(t.id);
       const membership = await deps.memberships.findByUserAndTournament(user.id, t.id);
       const myTeamId = membership?.teamId ?? null;
@@ -273,8 +275,8 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
       }));
     },
 
-    async getContext(user, matchupId) {
-      const t = await requireTournament();
+    async getContext(tournamentId, user, matchupId) {
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
 
       const [teamA, teamB] = await Promise.all([
@@ -383,8 +385,8 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
       };
     },
 
-    async submit(user, input) {
-      const t = await requireTournament();
+    async submit(tournamentId, user, input) {
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(input.matchupId, t.id);
       await authorizeForTeam(user, matchup, input.teamId, t.id);
       validateRound(input.roundNo, t);
@@ -429,8 +431,8 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
       );
     },
 
-    async lock(user, { matchupId, teamId, roundNo }) {
-      const t = await requireTournament();
+    async lock(tournamentId, user, { matchupId, teamId, roundNo }) {
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
       await authorizeForTeam(user, matchup, teamId, t.id);
       validateRound(roundNo, t);
@@ -448,9 +450,9 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
       });
     },
 
-    async unlock(user, { matchupId, teamId, roundNo }) {
+    async unlock(tournamentId, user, { matchupId, teamId, roundNo }) {
       if (!user.isAdmin) throw new ForbiddenError("Only an admin can unlock a lineup");
-      const t = await requireTournament();
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
       if (teamId !== matchup.teamAId && teamId !== matchup.teamBId) {
         throw new ValidationError("That team is not in this matchup");
@@ -474,9 +476,9 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
       });
     },
 
-    async reshuffle(user, matchupId) {
+    async reshuffle(tournamentId, user, matchupId) {
       if (!user.isAdmin) throw new ForbiddenError("Only an admin can re-randomize a matchup");
-      const t = await requireTournament();
+      const t = await requireTournament(tournamentId);
       const matchup = await requireMatchup(matchupId, t.id);
 
       const lineups = await deps.lineups.listByMatchup(matchupId);

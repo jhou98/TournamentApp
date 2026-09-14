@@ -10,7 +10,7 @@ import { Results } from "./pages/Results";
 import { Standings } from "./pages/Standings";
 
 function Nav() {
-  const { profile, logout } = useAuth();
+  const { profile, logout, tournaments, activeTournamentId, setActiveTournament } = useAuth();
   if (!profile) return null;
   return (
     <nav style={navStyle}>
@@ -20,10 +20,27 @@ function Nav() {
       <Link to="/results">Results</Link>
       {(profile.role === "captain" || profile.role === "admin") && <Link to="/lineups">Lineups</Link>}
       {profile.role === "admin" && <Link to="/admin">Admin</Link>}
-      <span style={{ marginLeft: "auto" }}>
-        {profile.user.displayName} ({profile.role})
+      <span style={{ marginLeft: "auto", display: "flex", gap: 12, alignItems: "center" }}>
+        {tournaments.length > 1 ? (
+          <select
+            aria-label="Active tournament"
+            value={activeTournamentId ?? ""}
+            onChange={(e) => setActiveTournament(e.target.value)}
+          >
+            {tournaments.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          tournaments.length === 1 && <span>{tournaments[0]!.name}</span>
+        )}
+        <span>
+          {profile.user.displayName} ({profile.role})
+        </span>
+        <button onClick={() => logout()}>Log out</button>
       </span>
-      <button onClick={() => logout()}>Log out</button>
     </nav>
   );
 }
@@ -37,10 +54,13 @@ function RequireAuth({ children, adminOnly }: { children: JSX.Element; adminOnly
 }
 
 function Shell() {
+  const { activeTournamentId } = useAuth();
   return (
     <div style={{ fontFamily: "system-ui, sans-serif" }}>
       <Nav />
-      <Routes>
+      {/* Remount routed pages when the active tournament changes so their
+          per-tournament data (US28) refetches on switch. */}
+      <Routes key={activeTournamentId ?? "none"}>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route

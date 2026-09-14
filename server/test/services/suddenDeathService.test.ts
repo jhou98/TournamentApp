@@ -81,11 +81,19 @@ function tiedFinal(): Stores {
 
 function buildService(stores: Stores): SuddenDeathService {
   const tournaments: TournamentRepo = {
-    async getCurrent() {
-      return { id: TID, name: "Test" };
+    async getDetail(id) {
+      return id === TID ? detail() : null;
     },
-    async getCurrentDetail() {
-      return detail();
+    async list() {
+      const t = detail();
+      return [{ id: t.id, name: t.name, status: t.status }];
+    },
+    async listByIds(ids) {
+      const t = detail();
+      return ids.includes(t.id) ? [{ id: t.id, name: t.name, status: t.status }] : [];
+    },
+    async create() {
+      throw new Error("not used");
     },
     async setStatus() {},
     async updateConfig() {
@@ -139,6 +147,9 @@ function buildService(stores: Stores): SuddenDeathService {
   const memberships: MembershipRepo = {
     async findByUserAndTournament(userId) {
       return stores.memberships.find((m) => m.userId === userId) ?? null;
+    },
+    async listByUser(userId) {
+      return stores.memberships.filter((m) => m.userId === userId);
     },
     async listByTeam(teamId) {
       return stores.memberships.filter((m) => m.teamId === teamId);
@@ -261,15 +272,15 @@ const asUser = (id: string, isAdmin = false): PublicUser => ({
 });
 
 async function pickBothReps(service: SuddenDeathService) {
-  await service.chooseRep(asUser("a1"), MID, { teamId: TA, userId: "a2" });
-  await service.chooseRep(asUser("b1"), MID, { teamId: TB, userId: "b2" });
+  await service.chooseRep(TID, asUser("a1"), MID, { teamId: TA, userId: "a2" });
+  await service.chooseRep(TID, asUser("b1"), MID, { teamId: TB, userId: "b2" });
 }
 
 describe("suddenDeathService.getState", () => {
   it("is active for a tied playoff matchup and lists eligible players", async () => {
     const stores = tiedFinal();
     const service = buildService(stores);
-    const state = await service.getState(asUser("a1"), MID);
+    const state = await service.getState(TID, asUser("a1"), MID);
     expect(state.active).toBe(true);
     expect(state.teamA.eligible.map((p) => p.id).sort()).toEqual(["a1", "a2"]);
     expect(state.teamA.rep).toBeNull();
@@ -286,19 +297,19 @@ describe("suddenDeathService.chooseRep", () => {
   });
 
   it("lets a captain pick a rep from their roster", async () => {
-    await service.chooseRep(asUser("a1"), MID, { teamId: TA, userId: "a2" });
+    await service.chooseRep(TID, asUser("a1"), MID, { teamId: TA, userId: "a2" });
     expect(stores.sd?.teamARep).toBe("a2");
   });
 
   it("rejects a non-captain", async () => {
     await expect(
-      service.chooseRep(asUser("a2"), MID, { teamId: TA, userId: "a1" }),
+      service.chooseRep(TID, asUser("a2"), MID, { teamId: TA, userId: "a1" }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("rejects a rep who is not on the team", async () => {
     await expect(
-      service.chooseRep(asUser("a1"), MID, { teamId: TA, userId: "b2" }),
+      service.chooseRep(TID, asUser("a1"), MID, { teamId: TA, userId: "b2" }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 });
@@ -313,23 +324,23 @@ describe("suddenDeathService.enterResult", () => {
 
   it("records the winner and finalizes the matchup", async () => {
     await pickBothReps(service);
-    await service.enterResult(asUser("admin1", true), MID, { scoreA: 5, scoreB: 3 });
+    await service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 5, scoreB: 3 });
     expect(stores.sd?.winnerTeamId).toBe(TA);
     expect(stores.matchup.status).toBe("final");
     expect(stores.matchup.winnerTeamId).toBe(TA);
   });
 
   it("requires both reps first", async () => {
-    await service.chooseRep(asUser("a1"), MID, { teamId: TA, userId: "a2" });
+    await service.chooseRep(TID, asUser("a1"), MID, { teamId: TA, userId: "a2" });
     await expect(
-      service.enterResult(asUser("admin1", true), MID, { scoreA: 5, scoreB: 3 }),
+      service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 5, scoreB: 3 }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("rejects a non-admin", async () => {
     await pickBothReps(service);
     await expect(
-      service.enterResult(asUser("a1"), MID, { scoreA: 5, scoreB: 3 }),
+      service.enterResult(TID, asUser("a1"), MID, { scoreA: 5, scoreB: 3 }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -337,18 +348,18 @@ describe("suddenDeathService.enterResult", () => {
     await pickBothReps(service);
     // Winner didn't reach 5.
     await expect(
-      service.enterResult(asUser("admin1", true), MID, { scoreA: 4, scoreB: 2 }),
+      service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 4, scoreB: 2 }),
     ).rejects.toBeInstanceOf(ValidationError);
     // Win-by-2 not met and not capped.
     await expect(
-      service.enterResult(asUser("admin1", true), MID, { scoreA: 5, scoreB: 4 }),
+      service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 5, scoreB: 4 }),
     ).rejects.toBeInstanceOf(ValidationError);
     // Over the cap.
     await expect(
-      service.enterResult(asUser("admin1", true), MID, { scoreA: 8, scoreB: 3 }),
+      service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 8, scoreB: 3 }),
     ).rejects.toBeInstanceOf(ValidationError);
     // Capped 7–6 is allowed.
-    await service.enterResult(asUser("admin1", true), MID, { scoreA: 7, scoreB: 6 });
+    await service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 7, scoreB: 6 });
     expect(stores.matchup.winnerTeamId).toBe(TA);
   });
 });

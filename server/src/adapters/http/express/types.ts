@@ -5,6 +5,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: PublicUser;
+      /** Active tournament resolved per request (US28); set by resolveTournament. */
+      tournamentId?: string;
     }
   }
 }
