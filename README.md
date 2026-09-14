@@ -6,9 +6,12 @@ round-robin schedule, randomly matches pairs once lineups lock, tracks scoring a
 standings, and seeds a playoff bracket (with 1v1 sudden death to break ties). Later
 phases layer on a per-player coin economy, a power-up shop, and commissioner tools.
 
-See [artifacts/artifact.md](./artifacts/artifact.md) for the full design doc (the
-source of truth) and [artifacts/Friendsgiving Badminton Tournament — Vibe Coding User Stories.md](./artifacts/Friendsgiving%20Badminton%20Tournament%20%E2%80%94%20Vibe%20Coding%20User%20Stories.md)
-for the original user stories.
+See [artifacts/artifact.md](./artifacts/artifact.md) for the full design doc — the
+original design intent that seeded the build (data model, flows, and the architecture
+rules the server still follows). It captures initial design and may drift from the code
+over time; where they disagree, the code is authoritative. The
+[original user stories](./artifacts/Friendsgiving%20Badminton%20Tournament%20%E2%80%94%20Vibe%20Coding%20User%20Stories.md)
+are also preserved there.
 
 Built as an npm-workspaces monorepo (`server`, `client`) with a ports & adapters
 (hexagonal) server core — see §11 of the design doc for the architecture rules.
