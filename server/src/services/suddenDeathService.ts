@@ -1,5 +1,6 @@
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../domain/errors.js";
 import { computeMatchupResult, type GameResultInput } from "../domain/standings.js";
+import type { EconomyService } from "./economyService.js";
 import type {
   GameRepo,
   MatchupRecord,
@@ -62,6 +63,7 @@ export interface SuddenDeathServiceDeps {
   users: UserRepo;
   games: GameRepo;
   suddenDeath: SuddenDeathRepo;
+  economy: EconomyService;
   uow: UnitOfWork;
 }
 
@@ -212,6 +214,9 @@ export function makeSuddenDeathService(deps: SuddenDeathServiceDeps): SuddenDeat
       await deps.uow.run(async () => {
         await deps.suddenDeath.setResult(matchupId, { scoreA, scoreB, winnerTeamId });
         await deps.matchups.setResult(matchupId, { status: "final", winnerTeamId });
+        // Deciding the matchup can complete or extend a player's streak, so
+        // recompute the whole tournament's derived coin rows (US15/D16).
+        await deps.economy.recomputeTournamentLedger(t.id);
       });
     },
   };

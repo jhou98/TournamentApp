@@ -149,6 +149,7 @@ export function buildContainer(env: Env): Container {
     users,
     games: gamesRepo,
     suddenDeath: suddenDeathRepo,
+    economy,
     uow: unitOfWork,
   });
 

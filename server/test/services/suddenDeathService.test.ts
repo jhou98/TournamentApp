@@ -54,6 +54,8 @@ interface Stores {
   memberships: MembershipRecord[];
   users: UserRecord[];
   sd: SuddenDeathRecord | null;
+  /** Tournament ids passed to economy.recomputeTournamentLedger, in call order. */
+  recomputes: string[];
 }
 
 /** A tied matchup: game 1 home wins, game 2 away wins (1–1). Defaults to a final. */
@@ -79,7 +81,7 @@ function tiedFinal(stage: MatchupRecord["stage"] = "final"): Stores {
     { id: "m-b1", userId: "b1", teamId: TB, tournamentId: TID, role: "captain", createdAt: new Date() },
     { id: "m-b2", userId: "b2", teamId: TB, tournamentId: TID, role: "member", createdAt: new Date() },
   ];
-  return { matchup, games, memberships, users: ["a1", "a2", "b1", "b2"].map(user), sd: null };
+  return { matchup, games, memberships, users: ["a1", "a2", "b1", "b2"].map(user), sd: null, recomputes: [] };
 }
 
 function buildService(stores: Stores): SuddenDeathService {
@@ -254,6 +256,12 @@ function buildService(stores: Stores): SuddenDeathService {
     async deleteByTournament() {},
   };
 
+  const economy = {
+    async recomputeTournamentLedger(tournamentId: string) {
+      stores.recomputes.push(tournamentId);
+    },
+  };
+
   return makeSuddenDeathService({
     tournaments,
     matchups,
@@ -262,6 +270,7 @@ function buildService(stores: Stores): SuddenDeathService {
     users,
     games,
     suddenDeath,
+    economy,
     uow: passthroughUow,
   });
 }
@@ -338,6 +347,12 @@ describe("suddenDeathService.enterResult", () => {
     expect(stores.sd?.winnerTeamId).toBe(TA);
     expect(stores.matchup.status).toBe("final");
     expect(stores.matchup.winnerTeamId).toBe(TA);
+  });
+
+  it("recomputes the coin ledger when the sudden-death result finalizes the matchup", async () => {
+    await pickBothReps(service);
+    await service.enterResult(TID, asUser("admin1", true), MID, { scoreA: 5, scoreB: 3 });
+    expect(stores.recomputes).toEqual([TID]);
   });
 
   it("lets an admin edit an already-recorded result", async () => {
