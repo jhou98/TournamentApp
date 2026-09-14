@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeResultsService, type ResultsService } from "./resultsService.js";
-import { ConflictError, NotFoundError, ValidationError } from "../domain/errors.js";
+import { makeResultsService, type ResultsService } from "../../src/services/resultsService.js";
+import { ConflictError, NotFoundError, ValidationError } from "../../src/domain/errors.js";
 import type {
   CourtRepo,
   GameRecord,
@@ -18,7 +18,7 @@ import type {
   UnitOfWork,
   UserRecord,
   UserRepo,
-} from "../ports/index.js";
+} from "../../src/ports/index.js";
 
 const TID = "t1";
 const MID = "m1";
@@ -92,6 +92,7 @@ function freshStores(): Stores {
     tournamentId: TID,
     stage: "round_robin",
     roundIndex: 1,
+    bracketSlot: null,
     teamAId: TA,
     teamBId: TB,
     status: "scheduled",

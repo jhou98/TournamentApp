@@ -129,7 +129,7 @@ export function AdminSchedule() {
         )}
       </div>
 
-      {/* --- Generate / reset --------------------------------------------- */}
+      {/* --- Generate / reset / seed playoffs ----------------------------- */}
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {isSetup ? (
           <button onClick={() => run(() => api("/admin/schedule/generate", { method: "POST" }))}>
@@ -140,7 +140,31 @@ export function AdminSchedule() {
             Reset schedule
           </button>
         )}
+        {config.status === "round_robin" && (
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Seed the playoffs from the current standings? Enter every round-robin result first.",
+                )
+              ) {
+                run(() => api("/admin/playoffs/seed", { method: "POST" }));
+              }
+            }}
+          >
+            Seed playoffs
+          </button>
+        )}
       </div>
+      {config.status === "playoffs" && (
+        <p style={{ fontSize: 13, color: "#555", marginBottom: 12 }}>
+          Playoffs are underway — manage lineups and enter scores from the Lineups and Results pages.
+          The final is created automatically once both semifinals finish.
+        </p>
+      )}
+      {config.status === "completed" && (
+        <p style={{ fontSize: 13, color: "#555", marginBottom: 12 }}>🏆 Tournament complete.</p>
+      )}
 
       {/* --- Courts -------------------------------------------------------- */}
       {schedule && schedule.courts.length > 0 && (

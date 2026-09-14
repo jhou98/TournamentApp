@@ -249,21 +249,23 @@ model Game {
 model SuddenDeath {
   id           String   @id @default(cuid())
   matchupId    String   @unique
-  teamARep     String
-  teamBRep     String
   teamAId      String
   teamBId      String
-  scoreA       Int
-  scoreB       Int
-  winnerTeamId String
+  // Reps are picked by each captain first; the score is entered by an admin later,
+  // so everything past the two teams is nullable until it's filled in (US12).
+  teamARep     String?
+  teamBRep     String?
+  scoreA       Int?
+  scoreB       Int?
+  winnerTeamId String?
   createdAt    DateTime @default(now())
 
   matchup    Matchup @relation(fields: [matchupId], references: [id])
-  repA       User    @relation("SuddenDeathTeamARep", fields: [teamARep], references: [id])
-  repB       User    @relation("SuddenDeathTeamBRep", fields: [teamBRep], references: [id])
+  repA       User?   @relation("SuddenDeathTeamARep", fields: [teamARep], references: [id])
+  repB       User?   @relation("SuddenDeathTeamBRep", fields: [teamBRep], references: [id])
   teamA      Team    @relation("SuddenDeathTeamA", fields: [teamAId], references: [id])
   teamB      Team    @relation("SuddenDeathTeamB", fields: [teamBId], references: [id])
-  winnerTeam Team    @relation("SuddenDeathWinner", fields: [winnerTeamId], references: [id])
+  winnerTeam Team?   @relation("SuddenDeathWinner", fields: [winnerTeamId], references: [id])
 
   @@map("sudden_death")
 }

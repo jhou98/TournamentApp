@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveRole } from "./roles.js";
+import { deriveRole } from "../../src/domain/roles.js";
 
 describe("deriveRole", () => {
   it("returns admin when isAdmin, regardless of membership", () => {

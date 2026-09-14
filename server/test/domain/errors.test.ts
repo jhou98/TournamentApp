@@ -6,7 +6,7 @@ import {
   NotFoundError,
   UnauthorizedError,
   ValidationError,
-} from "./errors.js";
+} from "../../src/domain/errors.js";
 
 describe("domain errors", () => {
   it("map to the expected HTTP status codes", () => {

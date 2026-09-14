@@ -7,6 +7,8 @@ interface StandingRow {
   matchupsPlayed: number;
   matchupsWon: number;
   matchupsLost: number;
+  matchupsTied: number;
+  points: number;
   gamesWon: number;
   gamesLost: number;
   gameDiff: number;
@@ -43,7 +45,7 @@ export function Standings() {
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
             <thead>
               <tr>
-                {["#", "Team", "W–L", "Games", "Game Diff", "Pt Diff"].map((h) => (
+                {["#", "Team", "Pts", "W–L–T", "Games", "Game Diff", "Pt Diff"].map((h) => (
                   <th key={h} style={th}>
                     {h}
                   </th>
@@ -55,8 +57,9 @@ export function Standings() {
                 <tr key={r.teamId}>
                   <td style={td}>{r.rank}</td>
                   <td style={{ ...td, fontWeight: 600 }}>{r.teamName}</td>
+                  <td style={{ ...td, fontWeight: 600 }}>{r.points}</td>
                   <td style={td}>
-                    {r.matchupsWon}–{r.matchupsLost}
+                    {r.matchupsWon}–{r.matchupsLost}–{r.matchupsTied}
                   </td>
                   <td style={td}>
                     {r.gamesWon}–{r.gamesLost}
@@ -68,8 +71,9 @@ export function Standings() {
             </tbody>
           </table>
           <p style={{ fontSize: 12, color: "#777", marginTop: 8 }}>
-            Ranked by matchup record, then game differential, then point differential. Rank seeds the
-            playoff bracket once pool play ends.
+            Points: win 3, tie 1, loss 0. Ranked by points, then game differential, then point
+            differential. Round-robin matchups can end in a tie (no overtime in pool play). Rank
+            seeds the playoff bracket once pool play ends.
           </p>
         </>
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { Overtime } from "../components/Overtime";
 
 interface MyMatchup {
   id: string;
@@ -57,9 +58,10 @@ interface LineupContext {
   pastPairings: PairView[];
 }
 
-type Draft = Record<string, string[][]>; // key `${teamId}:${roundNo}` -> pairs of playerIds
+type Draft = Record<string, string[][]>; // key `${matchupId}:${teamId}:${roundNo}` -> pairs of playerIds
 
-const keyOf = (teamId: string, roundNo: number) => `${teamId}:${roundNo}`;
+const keyOf = (matchupId: string, teamId: string, roundNo: number) =>
+  `${matchupId}:${teamId}:${roundNo}`;
 
 export function Lineups() {
   const { profile } = useAuth();
@@ -100,22 +102,29 @@ export function Lineups() {
   }
 
   function seedDrafts(c: LineupContext) {
-    const next: Draft = {};
-    for (const round of c.rounds) {
-      for (const side of [round.teamA, round.teamB]) {
-        if (!(c.isAdmin || c.myTeamId === side.id)) continue;
-        const existing = side.pairs ?? [];
-        const pairs: string[][] = [];
-        for (let p = 0; p < c.pairsPerLineup; p++) {
-          const players = existing[p]?.players.map((pl) => pl.id) ?? [];
-          const row: string[] = [];
-          for (let s = 0; s < c.pairSize; s++) row.push(players[s] ?? "");
-          pairs.push(row);
+    // Merge, don't replace: keep any in-progress edits (keyed by matchup + team +
+    // round) so refetching after a save/lock on one side never wipes the other
+    // side's unsaved work. Only seed keys we don't already have.
+    setDrafts((prev) => {
+      const next: Draft = { ...prev };
+      for (const round of c.rounds) {
+        for (const side of [round.teamA, round.teamB]) {
+          if (!(c.isAdmin || c.myTeamId === side.id)) continue;
+          const key = keyOf(c.matchupId, side.id, round.roundNo);
+          if (next[key]) continue;
+          const existing = side.pairs ?? [];
+          const pairs: string[][] = [];
+          for (let p = 0; p < c.pairsPerLineup; p++) {
+            const players = existing[p]?.players.map((pl) => pl.id) ?? [];
+            const row: string[] = [];
+            for (let s = 0; s < c.pairSize; s++) row.push(players[s] ?? "");
+            pairs.push(row);
+          }
+          next[key] = pairs;
         }
-        next[keyOf(side.id, round.roundNo)] = pairs;
       }
-    }
-    setDrafts(next);
+      return next;
+    });
   }
 
   async function run(fn: () => Promise<unknown>, ok?: string) {
@@ -131,7 +140,8 @@ export function Lineups() {
   }
 
   function setCell(teamId: string, roundNo: number, pairIdx: number, slotIdx: number, value: string) {
-    const key = keyOf(teamId, roundNo);
+    if (!selected) return;
+    const key = keyOf(selected, teamId, roundNo);
     setDrafts((d) => {
       const pairs = (d[key] ?? []).map((row) => [...row]);
       if (pairs[pairIdx]) pairs[pairIdx]![slotIdx] = value;
@@ -140,7 +150,7 @@ export function Lineups() {
   }
 
   function submit(teamId: string, roundNo: number) {
-    const pairs = drafts[keyOf(teamId, roundNo)] ?? [];
+    const pairs = drafts[keyOf(selected!, teamId, roundNo)] ?? [];
     return run(
       () =>
         api(`/matchups/${selected}/lineups`, {
@@ -153,7 +163,7 @@ export function Lineups() {
   function lock(teamId: string, roundNo: number) {
     // Save the current draft first so "Lock" also commits any pending edits
     // (a no-op when nothing changed) — one click to lock without a prior save.
-    const pairs = drafts[keyOf(teamId, roundNo)] ?? [];
+    const pairs = drafts[keyOf(selected!, teamId, roundNo)] ?? [];
     return run(async () => {
       await api(`/matchups/${selected}/lineups`, {
         method: "POST",
@@ -173,6 +183,12 @@ export function Lineups() {
           body: JSON.stringify({ teamId, roundNo }),
         }),
       "Lineup unlocked.",
+    );
+  }
+  function rematch() {
+    return run(
+      () => api(`/matchups/${selected}/lineups/rematch`, { method: "POST" }),
+      "Pairings re-randomized.",
     );
   }
 
@@ -205,9 +221,26 @@ export function Lineups() {
 
       {ctx && (
         <div>
-          <h2 style={{ fontSize: 18 }}>
-            {ctx.teamA.name} vs {ctx.teamB.name}
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h2 style={{ fontSize: 18 }}>
+              {ctx.teamA.name} vs {ctx.teamB.name}
+            </h2>
+            {ctx.isAdmin && ctx.rounds.some((r) => r.revealed) && (
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Re-randomize all pairings for this matchup? Only do this before games are scored.",
+                    )
+                  ) {
+                    rematch();
+                  }
+                }}
+              >
+                🎲 Re-randomize (admin)
+              </button>
+            )}
+          </div>
           {ctx.pastPairings.length > 0 && (
             <p style={{ fontSize: 13, color: "#666" }}>
               Your past pairings:{" "}
@@ -227,7 +260,7 @@ export function Lineups() {
                     side={side}
                     roundNo={round.roundNo}
                     editable={canEdit(side.id)}
-                    draft={drafts[keyOf(side.id, round.roundNo)]}
+                    draft={drafts[keyOf(ctx.matchupId, side.id, round.roundNo)]}
                     onCell={setCell}
                     onSubmit={() => submit(side.id, round.roundNo)}
                     onLock={() => lock(side.id, round.roundNo)}
@@ -258,6 +291,14 @@ export function Lineups() {
               )}
             </div>
           ))}
+
+          <Overtime
+            matchupId={ctx.matchupId}
+            mode="setup"
+            isAdmin={ctx.isAdmin}
+            myTeamId={ctx.myTeamId}
+            onResolved={() => selected && loadContext(selected)}
+          />
 
           {!ctx.isAdmin && !ctx.myTeamId && (
             <p style={{ color: "#777" }}>

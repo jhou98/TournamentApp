@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { makeHealthService } from "./healthService.js";
-import type { SystemPort } from "../ports/index.js";
+import { makeHealthService } from "../../src/services/healthService.js";
+import type { SystemPort } from "../../src/ports/index.js";
 
 const fakeSystem = (ping: SystemPort["ping"]): SystemPort => ({ ping });
 

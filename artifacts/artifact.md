@@ -3,9 +3,41 @@
 > **Status:** Living design doc. **Implementation in progress** — Phase 0 Part 0
 > (foundation + health), Part 1 (auth, roster, captains — US1–US3), Part 2
 > (round-robin schedule generation + court assignment — US4–US5), Part 3
-> (captain lineups, validation, random pair assignment — US6–US8), and Part 4
-> (match scoring + standings/seeding — US9–US10) have landed.
+> (captain lineups, validation, random pair assignment — US6–US8), Part 4
+> (match scoring + standings/seeding — US9–US10), and Part 5 (playoffs, sudden
+> death — US11–US12) have landed. **Phase 0 is complete except the backlog story
+> US28** (multi-tournament / per-tournament coins), to pick up before Phase 1.
 > Owner: @jhou98. Last updated: 2026-09-13.
+>
+> **Changelog (2026-09-13) — Part 5:** US11–US12 shipped, plus a matchup-matching
+> fix. **Playoffs (US11):** `POST /api/admin/playoffs/seed` seeds the bracket from final
+> round-robin standings (top `playoff_qualifiers`; supports **2 or 4** — the `semifinal|final`
+> enum) → `#1v#4` / `#2v#3`; `status → playoffs`. Advancement is **idempotent** (`sync`,
+> called after every score/sudden-death write): the **final is created from the two semifinal
+> winners** (deferred so team columns stay non-null), and a decided final sets
+> `status → completed` (champion = final winner). **Sudden death (US12):** a tied (3–3)
+> playoff/final leaves the matchup undecided; each captain picks one eligible rep
+> (`POST /api/matchups/:id/sudden-death/rep`), an admin enters the 1v1 result
+> (`POST /api/admin/matchups/:id/sudden-death`, validated **first-to-5 / win-by-2 / cap-7**),
+> and the winner finalizes the matchup → advancement. `sudden_death` rows are now nullable
+> (reps persist before the score; **migration** `…_sudden_death_nullable_and_bracket`).
+> **Matching-timing fix:** random pair assignment now fires only once **every** lineup in a
+> matchup (both teams, all rounds/matches) is locked — never per match — so a captain can't
+> read the opponent's revealed pairs for one match while another is still unlocked. Admins can
+> **re-randomize** a fully-locked, unscored matchup (`POST /api/matchups/:id/lineups/rematch`)
+> if a draw looks lopsided (D12). Standings/seeding count **round-robin only**.
+>
+> **Changelog (2026-09-13) — round-robin ties (D19):** since sudden death is **playoff-only**,
+> a round-robin matchup with a level game tally is now a **completed draw** (finalizes with no
+> winner) instead of dangling `in_progress`. Standings show **W-L-T** and rank by **league
+> points (win 3, tie 1, loss 0)** → game diff → point diff → name. **UI labels:** a round-robin
+> tie shows **"Tie"** (no sudden-death wording); a playoff tie's 1v1 decider is shown as
+> **"Overtime"** — the `sudden_death` table/API name is unchanged (UI relabel only). The overtime
+> UI splits by page: **rep selection (setup) on Lineups**, **result entry (scoring) on Results**
+> (shared `Overtime` component, `mode="setup"|"scoring"`); editing a decided final back to a tie
+> **re-opens** the tournament (`completed → playoffs`). Fixes the "0-0 record but 1-1 games"
+> artifact. Also fixed a Lineups UX bug: saving/locking one side no longer wipes the other side's
+> unsaved draft (drafts are matchup-scoped and preserved across refetches).
 >
 > **Changelog (2026-09-13) — Part 4:** US9–US10 shipped. Admins enter/edit a per-game
 > score via `PATCH /api/admin/games/:id` (`{scoreHome, scoreAway, courtId?}`); a game must
@@ -246,7 +278,7 @@ Stored on the `tournament` row (or a small `settings` table); editable while
 **sudden_death** — `id`, `matchup_id`, `team_a_rep` (user_id), `team_b_rep` (user_id), `score_a`, `score_b`, `winner_team_id`, `created_at`
 *(created only when a matchup's game wins tie; rules from `sudden_death_rule`.)*
 
-**standing** — *derived at view time,* not stored: per team → matchup record, games won/lost, point differential, rank (record → differential → admin tiebreaker). Final round-robin ranks seed the playoff bracket.
+**standing** — *derived at view time,* not stored: per team → matchup record **W-L-T**, **league points (win 3, tie 1, loss 0)**, games won/lost, game differential, point differential, rank. **A round-robin matchup can end in a tie** (level game tally; sudden death is playoff-only, D19), which finalizes the matchup with no winner and gives both teams a tie. Rank order: **points → game differential → point differential → team name** (admin-defined tiebreaker still deferred). Final round-robin ranks seed the playoff bracket.
 
 ### Economy tables (P1) — coins are **per player**
 
@@ -478,6 +510,7 @@ between captains → lineups → randomized matchups → results → standings �
 | **D16** | Streak bonus direction | **Both, configurable** via `streak_rule.direction` (`loss` \| `win` \| `both`). Losing-streak protection default from the source doc (+25/+50/+75 at 2/3/4+ losses); win-streak reward uses the same tiered shape. A streak resets when the run breaks. Amounts/tiers admin-tunable. |
 | **D17** | Bounty / mission completion | **Admin marks complete.** Commissioner/admin confirms a bounty or mission was earned, which writes the coin credit. (Auto-detection of common bounty conditions can be added later.) |
 | **D18** | Password management | **Deferred to a later phase (P3 account settings).** Passwords are bcrypt-hashed and never viewable. Self-service change password (`POST /api/me/password`) and admin reset (`POST /api/admin/users/:id/password`) are planned but intentionally not in Phase 0. See §5. |
+| **D19** | Round-robin ties & ranking | **Sudden death is playoff-only** (US12); a round-robin matchup with a level game tally is a **completed draw** (finalizes, no winner). Standings track **W-L-T** and rank by **league points (win 3, tie 1, loss 0) → game differential → point differential → team name**. A draw is only possible when games-per-matchup is even (e.g. 2 or 4 pairs, or the default 3×2=6 → 3–3); an odd total can't tie. Admin-defined tiebreaker still deferred. |
 
 ### Open — deferred (P1, **not P0 blockers**)
 > These only bite once the economy lands; settle during implementation. P0 doesn't touch them.

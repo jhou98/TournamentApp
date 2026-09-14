@@ -4,6 +4,8 @@ import { ValidationError } from "../../../../domain/errors.js";
 import type { RosterService } from "../../../../services/rosterService.js";
 import type { ScheduleService } from "../../../../services/scheduleService.js";
 import type { ResultsService } from "../../../../services/resultsService.js";
+import type { PlayoffsService } from "../../../../services/playoffsService.js";
+import type { SuddenDeathService } from "../../../../services/suddenDeathService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { asyncHandler } from "../asyncHandler.js";
 import { requireParam } from "../params.js";
@@ -47,6 +49,10 @@ const editMatchupSchema = z.object({
   teamBId: z.string().min(1),
 });
 const renameCourtSchema = z.object({ label: z.string().trim().min(1).max(60) });
+const suddenDeathResultSchema = z.object({
+  scoreA: z.number().int().nonnegative(),
+  scoreB: z.number().int().nonnegative(),
+});
 // A game edit may enter/edit a score, reassign a court, or both (US9 + Part 2).
 const editGameSchema = z
   .object({
@@ -65,6 +71,8 @@ export function adminRouter(
   roster: RosterService,
   schedule: ScheduleService,
   results: ResultsService,
+  playoffs: PlayoffsService,
+  suddenDeath: SuddenDeathService,
   mw: AuthMiddleware,
 ): Router {
   const router = Router();
@@ -222,9 +230,32 @@ export function adminRouter(
           scoreAway: body.scoreAway,
           ...(body.courtId ? { courtId: body.courtId } : {}),
         });
+        // A decided semifinal/final may advance the bracket (create the final /
+        // complete the tournament). Idempotent no-op during the round robin.
+        await playoffs.sync();
       } else if (body.courtId) {
         await schedule.reassignCourt(gameId, body.courtId);
       }
+      res.status(204).end();
+    }),
+  );
+
+  // --- Playoffs & sudden death (US11 / US12) -------------------------------
+
+  router.post(
+    "/playoffs/seed",
+    asyncHandler(async (req, res) => {
+      await playoffs.seed(req.user!);
+      res.status(201).json(await results.getResults(req.user!));
+    }),
+  );
+
+  router.post(
+    "/matchups/:id/sudden-death",
+    asyncHandler(async (req, res) => {
+      const { scoreA, scoreB } = parse(suddenDeathResultSchema, req.body);
+      await suddenDeath.enterResult(req.user!, requireParam(req, "id"), { scoreA, scoreB });
+      await playoffs.sync();
       res.status(204).end();
     }),
   );

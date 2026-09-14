@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { ValidationError } from "../../../../domain/errors.js";
 import type { LineupService } from "../../../../services/lineupService.js";
+import type { SuddenDeathService } from "../../../../services/suddenDeathService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { asyncHandler } from "../asyncHandler.js";
 import { requireParam } from "../params.js";
@@ -23,9 +24,14 @@ const lockSchema = z.object({
   teamId: z.string().min(1),
   roundNo: z.number().int().positive(),
 });
+const repSchema = z.object({ teamId: z.string().min(1), userId: z.string().min(1) });
 
-/** Captain lineups + random assignment (US6–US8). Auth required; team-scoped in the service. */
-export function matchupsRouter(lineups: LineupService, mw: AuthMiddleware): Router {
+/** Captain lineups + random assignment (US6–US8) and sudden-death rep picks (US12). */
+export function matchupsRouter(
+  lineups: LineupService,
+  suddenDeath: SuddenDeathService,
+  mw: AuthMiddleware,
+): Router {
   const router = Router();
   router.use(mw.requireAuth);
 
@@ -79,6 +85,32 @@ export function matchupsRouter(lineups: LineupService, mw: AuthMiddleware): Rout
         teamId,
         roundNo,
       });
+      res.status(204).end();
+    }),
+  );
+
+  // Admin-only re-randomize of the whole matchup's pairings (checked in the service).
+  router.post(
+    "/:id/lineups/rematch",
+    asyncHandler(async (req, res) => {
+      await lineups.reshuffle(req.user!, requireParam(req, "id"));
+      res.status(204).end();
+    }),
+  );
+
+  // Sudden death (US12): read state; captains pick a representative.
+  router.get(
+    "/:id/sudden-death",
+    asyncHandler(async (req, res) => {
+      res.json(await suddenDeath.getState(req.user!, requireParam(req, "id")));
+    }),
+  );
+
+  router.post(
+    "/:id/sudden-death/rep",
+    asyncHandler(async (req, res) => {
+      const { teamId, userId } = parse(repSchema, req.body);
+      await suddenDeath.chooseRep(req.user!, requireParam(req, "id"), { teamId, userId });
       res.status(204).end();
     }),
   );

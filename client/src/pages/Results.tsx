@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { Overtime } from "../components/Overtime";
 
 interface PlayerView {
   id: string;
@@ -78,15 +79,52 @@ export function Results() {
     }
   }
 
+  const champion = data?.matchups.find((m) => m.stage === "final" && m.winnerTeamName)?.winnerTeamName;
+  const grouped: { label: string; stages: string[] }[] = [
+    { label: "Round robin", stages: ["round_robin"] },
+    { label: "Playoffs", stages: ["semifinal", "final"] },
+  ];
+
   return (
     <div style={{ maxWidth: 860, margin: "1.5rem auto" }}>
       <h1>Results</h1>
       {error && <p style={{ color: "crimson" }}>{error}</p>}
       {notice && <p style={{ color: "green" }}>{notice}</p>}
+      {champion && (
+        <div
+          style={{
+            border: "2px solid #d4a017",
+            background: "#fffbea",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 16,
+            fontSize: 18,
+            fontWeight: 700,
+          }}
+        >
+          🏆 Champion: {champion}
+        </div>
+      )}
       {data && data.matchups.length === 0 && <p>No matchups yet.</p>}
-      {data?.matchups.map((m) => (
-        <MatchupCard key={m.id} matchup={m} canScore={data.isAdmin} onScore={saveScore} />
-      ))}
+      {data &&
+        grouped.map((group) => {
+          const ms = data.matchups.filter((m) => group.stages.includes(m.stage));
+          if (ms.length === 0) return null;
+          return (
+            <section key={group.label} style={{ marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18 }}>{group.label}</h2>
+              {ms.map((m) => (
+                <MatchupCard
+                  key={m.id}
+                  matchup={m}
+                  canScore={data.isAdmin}
+                  onScore={saveScore}
+                  onResolved={load}
+                />
+              ))}
+            </section>
+          );
+        })}
     </div>
   );
 }
@@ -95,22 +133,28 @@ function MatchupCard({
   matchup: m,
   canScore,
   onScore,
+  onResolved,
 }: {
   matchup: MatchupView;
   canScore: boolean;
   onScore: (gameId: string, h: number, a: number) => void;
+  onResolved: () => void;
 }) {
+  const stageLabel = m.stage === "semifinal" ? "Semifinal · " : m.stage === "final" ? "Final · " : "";
   return (
     <div style={cardStyle}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <strong style={{ fontSize: 16 }}>
+          {stageLabel}
           {m.teamAName} {m.matchupScore.teamA}–{m.matchupScore.teamB} {m.teamBName}
         </strong>
         <span style={{ fontSize: 13, color: "#666" }}>
-          {m.decided
-            ? `✅ ${m.winnerTeamName} wins`
+          {m.winnerTeamName
+            ? `✅ ${m.winnerTeamName} wins${m.tied ? " (overtime)" : ""}`
             : m.tied
-              ? "Tied — sudden death"
+              ? m.stage === "round_robin"
+                ? "Tie"
+                : "Tied — overtime"
               : m.status === "in_progress"
                 ? "In progress"
                 : "Scheduled"}
@@ -133,6 +177,16 @@ function MatchupCard({
           </table>
         </div>
       ))}
+
+      {m.stage !== "round_robin" && (
+        <Overtime
+          matchupId={m.id}
+          mode="scoring"
+          isAdmin={canScore}
+          myTeamId={null}
+          onResolved={onResolved}
+        />
+      )}
     </div>
   );
 }

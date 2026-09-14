@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeScheduleService, type ScheduleService } from "./scheduleService.js";
-import { ConflictError, NotFoundError, ValidationError } from "../domain/errors.js";
+import { makeScheduleService, type ScheduleService } from "../../src/services/scheduleService.js";
+import { ConflictError, NotFoundError, ValidationError } from "../../src/domain/errors.js";
 import type {
   CourtRecord,
   CourtRepo,
@@ -10,12 +10,13 @@ import type {
   LineupWithPairs,
   MatchupRecord,
   MatchupRepo,
+  SuddenDeathRepo,
   TeamRecord,
   TeamRepo,
   TournamentDetail,
   TournamentRepo,
   UnitOfWork,
-} from "../ports/index.js";
+} from "../../src/ports/index.js";
 
 const TID = "t1";
 const passthroughUow: UnitOfWork = { run: (work) => work() };
@@ -126,6 +127,7 @@ function buildService(stores: Stores): ScheduleService {
           tournamentId,
           stage: m.stage,
           roundIndex: m.roundIndex,
+          bracketSlot: m.bracketSlot ?? null,
           teamAId: m.teamAId,
           teamBId: m.teamBId,
           status: "scheduled",
@@ -268,6 +270,24 @@ function buildService(stores: Stores): ScheduleService {
     },
   };
 
+  const suddenDeath: SuddenDeathRepo = {
+    async findByMatchup() {
+      return null;
+    },
+    async create() {
+      throw new Error("not used");
+    },
+    async setRep() {
+      throw new Error("not used");
+    },
+    async setResult() {
+      throw new Error("not used");
+    },
+    async deleteByTournament() {
+      /* no sudden-death rows in these tests */
+    },
+  };
+
   return makeScheduleService({
     tournaments,
     teams,
@@ -275,6 +295,7 @@ function buildService(stores: Stores): ScheduleService {
     games,
     courts,
     lineups,
+    suddenDeath,
     uow: passthroughUow,
   });
 }

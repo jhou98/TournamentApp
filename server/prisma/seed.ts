@@ -52,6 +52,21 @@ async function main() {
   // Idempotent by username; existing rows are left untouched so a re-seed never
   // rewrites a password someone already changed.
   const passwordHash = await bcrypt.hash("password", 10);
+
+  // A ready-to-use admin for local dev (gated with the demo players so prod,
+  // where SEED_DEMO_USERS is unset, still requires the bootstrap-code flow).
+  const admin = await prisma.user.upsert({
+    where: { username: "admin1" },
+    update: {},
+    create: {
+      username: "admin1",
+      displayName: "admin 1",
+      passwordHash,
+      isAdmin: true,
+    },
+  });
+  console.log(`Seeded admin: ${admin.username} (${admin.displayName})`);
+
   for (const p of DEMO_PLAYERS) {
     const user = await prisma.user.upsert({
       where: { username: p.username },

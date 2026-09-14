@@ -9,6 +9,7 @@ import type {
   MatchupRepo,
   NewGame,
   NewMatchup,
+  SuddenDeathRepo,
   TeamRepo,
   TournamentConfig,
   TournamentDetail,
@@ -55,6 +56,7 @@ export interface ScheduleServiceDeps {
   games: GameRepo;
   courts: CourtRepo;
   lineups: LineupRepo;
+  suddenDeath: SuddenDeathRepo;
   uow: UnitOfWork;
 }
 
@@ -243,7 +245,8 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
 
       await deps.uow.run(async () => {
         // Clean slate in case a prior partial schedule lingers (order matters:
-        // games and lineups reference matchups).
+        // games, lineups, and sudden-death rows reference matchups).
+        await deps.suddenDeath.deleteByTournament(t.id);
         await deps.games.deleteByTournament(t.id);
         await deps.lineups.deleteByTournament(t.id);
         await deps.matchups.deleteByTournament(t.id);
@@ -279,6 +282,7 @@ export function makeScheduleService(deps: ScheduleServiceDeps): ScheduleService 
         throw new ConflictError("Cannot reset a schedule that already has finalized games");
       }
       await deps.uow.run(async () => {
+        await deps.suddenDeath.deleteByTournament(t.id);
         await deps.games.deleteByTournament(t.id);
         await deps.lineups.deleteByTournament(t.id);
         await deps.matchups.deleteByTournament(t.id);

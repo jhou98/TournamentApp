@@ -5,7 +5,7 @@ import {
   validateLineup,
   type LineupProblem,
   type LineupRules,
-} from "./lineup.js";
+} from "../../src/domain/lineup.js";
 
 const roster = ["p1", "p2", "p3", "p4", "p5", "p6"];
 const rules = (overrides: Partial<LineupRules> = {}): LineupRules => ({

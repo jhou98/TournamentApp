@@ -40,3 +40,4 @@ export type {
   NewPair,
   SaveLineupInput,
 } from "./LineupRepo.js";
+export type { SuddenDeathRepo, SuddenDeathRecord } from "./SuddenDeathRepo.js";

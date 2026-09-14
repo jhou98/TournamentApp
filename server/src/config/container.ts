@@ -10,6 +10,7 @@ import { makePrismaCourtRepo } from "../adapters/db/prisma/courtRepo.js";
 import { makePrismaMatchupRepo } from "../adapters/db/prisma/matchupRepo.js";
 import { makePrismaGameRepo } from "../adapters/db/prisma/gameRepo.js";
 import { makePrismaLineupRepo } from "../adapters/db/prisma/lineupRepo.js";
+import { makePrismaSuddenDeathRepo } from "../adapters/db/prisma/suddenDeathRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -19,6 +20,8 @@ import { makeRosterService, type RosterService } from "../services/rosterService
 import { makeScheduleService, type ScheduleService } from "../services/scheduleService.js";
 import { makeLineupService, type LineupService } from "../services/lineupService.js";
 import { makeResultsService, type ResultsService } from "../services/resultsService.js";
+import { makePlayoffsService, type PlayoffsService } from "../services/playoffsService.js";
+import { makeSuddenDeathService, type SuddenDeathService } from "../services/suddenDeathService.js";
 import type { UnitOfWork } from "../ports/index.js";
 import type { Env } from "./env.js";
 
@@ -32,6 +35,8 @@ export interface Container {
     schedule: ScheduleService;
     lineups: LineupService;
     results: ResultsService;
+    playoffs: PlayoffsService;
+    suddenDeath: SuddenDeathService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -48,6 +53,7 @@ export function buildContainer(env: Env): Container {
   const matchups = makePrismaMatchupRepo();
   const gamesRepo = makePrismaGameRepo();
   const lineups = makePrismaLineupRepo();
+  const suddenDeathRepo = makePrismaSuddenDeathRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -81,6 +87,7 @@ export function buildContainer(env: Env): Container {
     games: gamesRepo,
     courts,
     lineups,
+    suddenDeath: suddenDeathRepo,
     uow: unitOfWork,
   });
 
@@ -108,6 +115,26 @@ export function buildContainer(env: Env): Container {
     uow: unitOfWork,
   });
 
+  const playoffs = makePlayoffsService({
+    tournaments,
+    matchups,
+    teams,
+    games: gamesRepo,
+    courts,
+    uow: unitOfWork,
+  });
+
+  const suddenDeath = makeSuddenDeathService({
+    tournaments,
+    matchups,
+    teams,
+    memberships,
+    users,
+    games: gamesRepo,
+    suddenDeath: suddenDeathRepo,
+    uow: unitOfWork,
+  });
+
   return {
     env,
     unitOfWork,
@@ -118,6 +145,8 @@ export function buildContainer(env: Env): Container {
       schedule,
       lineups: lineupService,
       results,
+      playoffs,
+      suddenDeath,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };

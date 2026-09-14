@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutGames } from "./scheduleLayout.js";
+import { layoutGames } from "../../src/domain/scheduleLayout.js";
 
 describe("layoutGames", () => {
   it("creates roundsPerMatchup x pairsPerLineup games per matchup", () => {

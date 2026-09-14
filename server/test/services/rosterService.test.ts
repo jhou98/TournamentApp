@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { makeRosterService } from "./rosterService.js";
-import { ConflictError, ValidationError } from "../domain/errors.js";
+import { makeRosterService } from "../../src/services/rosterService.js";
+import { ConflictError, ValidationError } from "../../src/domain/errors.js";
 import type {
   MembershipRecord,
   MembershipRepo,
@@ -12,7 +12,7 @@ import type {
   TournamentStatus,
   UnitOfWork,
   UserRepo,
-} from "../ports/index.js";
+} from "../../src/ports/index.js";
 
 const TID = "t1";
 

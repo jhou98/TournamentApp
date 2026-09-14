@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateRoundRobin, roundRobinRoundCount } from "./roundRobin.js";
+import { generateRoundRobin, roundRobinRoundCount } from "../../src/domain/roundRobin.js";
 
 /** Canonical unordered key for a pairing, so team A/B order doesn't matter. */
 const pairKey = (a: string, b: string) => [a, b].sort().join("-");

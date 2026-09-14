@@ -117,6 +117,8 @@ export interface LineupService {
     user: PublicUser,
     args: { matchupId: string; teamId: string; roundNo: number },
   ): Promise<void>;
+  /** Admin re-randomizes home↔away pairings on the locked lineups (US8/D12). */
+  reshuffle(user: PublicUser, matchupId: string): Promise<void>;
 }
 
 export function makeLineupService(deps: LineupServiceDeps): LineupService {
@@ -185,31 +187,65 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
     }
   }
 
-  /** Assign pairs for a round when both teams are locked; no-op otherwise. */
-  async function maybeAssignRound(matchup: MatchupRecord, roundNo: number): Promise<boolean> {
-    const home = await deps.lineups.findByRound(matchup.id, matchup.teamAId, roundNo);
-    const away = await deps.lineups.findByRound(matchup.id, matchup.teamBId, roundNo);
-    if (!home?.locked || !away?.locked) return false;
+  const pairIdsOf = (lineup: LineupWithPairs) =>
+    [...lineup.pairs].sort((a, b) => a.slot - b.slot).map((p) => p.id);
 
-    const games = (await deps.games.listByMatchup(matchup.id)).filter((g) => g.roundNo === roundNo);
-    // Immutable once set (D12): only assign while games still await lineups.
-    if (games.length === 0 || games.some((g) => g.status !== "awaiting_lineups")) return false;
-
-    const homePairIds = [...home.pairs].sort((a, b) => a.slot - b.slot).map((p) => p.id);
-    const awayPairIds = [...away.pairs].sort((a, b) => a.slot - b.slot).map((p) => p.id);
-    if (homePairIds.length !== games.length || awayPairIds.length !== games.length) {
+  /** Randomly match one round's home pairs against its away pairs. */
+  async function assignRound(
+    matchupId: string,
+    roundGames: { id: string }[],
+    home: LineupWithPairs,
+    away: LineupWithPairs,
+  ): Promise<void> {
+    const homePairIds = pairIdsOf(home);
+    const awayPairIds = pairIdsOf(away);
+    if (homePairIds.length !== roundGames.length || awayPairIds.length !== roundGames.length) {
       throw new ConflictError("Lineup pair count does not match the scheduled games for this round");
     }
-
     const assignment = assignPairs(homePairIds, awayPairIds, rng);
     await deps.games.assignPairs(
       assignment.map((a, i) => ({
-        gameId: games[i]!.id,
+        gameId: roundGames[i]!.id,
         homePairId: a.homePairId,
         awayPairId: a.awayPairId,
       })),
     );
-    return true;
+  }
+
+  /**
+   * Randomize the matchup once **every** lineup (both teams, all rounds) is
+   * locked — never per round. This keeps a captain from learning the opponent's
+   * pairs (or the random matchup) for one match while another match is still
+   * unlocked. Assigns only rounds whose games still await lineups, so re-locking
+   * after an admin unlock re-randomizes just that round. No-op until fully locked.
+   */
+  async function maybeAssignMatchup(
+    matchup: MatchupRecord,
+    roundsPerMatchup: number,
+  ): Promise<boolean> {
+    const lineups = await deps.lineups.listByMatchup(matchup.id);
+    const lineupFor = (teamId: string, roundNo: number) =>
+      lineups.find((l) => l.teamId === teamId && l.roundNo === roundNo) ?? null;
+
+    // Gate: all lineups locked before anything is revealed.
+    for (let roundNo = 1; roundNo <= roundsPerMatchup; roundNo++) {
+      const home = lineupFor(matchup.teamAId, roundNo);
+      const away = lineupFor(matchup.teamBId, roundNo);
+      if (!home?.locked || !away?.locked) return false;
+    }
+
+    const games = await deps.games.listByMatchup(matchup.id);
+    let assignedAny = false;
+    for (let roundNo = 1; roundNo <= roundsPerMatchup; roundNo++) {
+      const roundGames = games.filter((g) => g.roundNo === roundNo);
+      // Immutable once set (D12): only assign rounds still awaiting lineups.
+      if (roundGames.length === 0 || roundGames.some((g) => g.status !== "awaiting_lineups")) {
+        continue;
+      }
+      await assignRound(matchup.id, roundGames, lineupFor(matchup.teamAId, roundNo)!, lineupFor(matchup.teamBId, roundNo)!);
+      assignedAny = true;
+    }
+    return assignedAny;
   }
 
   return {
@@ -407,7 +443,7 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
 
       return deps.uow.run(async () => {
         if (!lineup.locked) await deps.lineups.setLocked(lineup.id, true);
-        const assigned = await maybeAssignRound(matchup, roundNo);
+        const assigned = await maybeAssignMatchup(matchup, t.roundsPerMatchup);
         return { locked: true, assigned };
       });
     },
@@ -435,6 +471,35 @@ export function makeLineupService(deps: LineupServiceDeps): LineupService {
         // Undo any random assignment so the round can be re-picked and re-matched.
         await deps.games.clearAssignmentsForRound(matchupId, roundNo);
         await deps.lineups.setLocked(lineup.id, false);
+      });
+    },
+
+    async reshuffle(user, matchupId) {
+      if (!user.isAdmin) throw new ForbiddenError("Only an admin can re-randomize a matchup");
+      const t = await requireTournament();
+      const matchup = await requireMatchup(matchupId, t.id);
+
+      const lineups = await deps.lineups.listByMatchup(matchupId);
+      const games = await deps.games.listByMatchup(matchupId);
+      if (games.length === 0) throw new ValidationError("This matchup has no games to match");
+      if (games.some((g) => g.status === "final")) {
+        throw new ConflictError("Cannot re-randomize a matchup that already has final results");
+      }
+      if (games.some((g) => g.status === "awaiting_lineups")) {
+        throw new ConflictError("Both captains must lock every lineup before re-randomizing");
+      }
+
+      const lineupFor = (teamId: string, roundNo: number) =>
+        lineups.find((l) => l.teamId === teamId && l.roundNo === roundNo) ?? null;
+
+      await deps.uow.run(async () => {
+        for (let roundNo = 1; roundNo <= t.roundsPerMatchup; roundNo++) {
+          const roundGames = games.filter((g) => g.roundNo === roundNo);
+          const home = lineupFor(matchup.teamAId, roundNo);
+          const away = lineupFor(matchup.teamBId, roundNo);
+          if (!home || !away || roundGames.length === 0) continue;
+          await assignRound(matchupId, roundGames, home, away);
+        }
       });
     },
   };

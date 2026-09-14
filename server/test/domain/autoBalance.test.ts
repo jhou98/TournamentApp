@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balancePlayers } from "./autoBalance.js";
+import { balancePlayers } from "../../src/domain/autoBalance.js";
 
 describe("balancePlayers", () => {
   it("distributes players evenly round-robin", () => {

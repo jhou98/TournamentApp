@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeAuthService, type AuthService } from "./authService.js";
-import { ConflictError, UnauthorizedError, ValidationError } from "../domain/errors.js";
+import { makeAuthService, type AuthService } from "../../src/services/authService.js";
+import { ConflictError, UnauthorizedError, ValidationError } from "../../src/domain/errors.js";
 import type {
   InviteRecord,
   InviteRepo,
@@ -12,7 +12,7 @@ import type {
   TournamentRepo,
   UserRecord,
   UserRepo,
-} from "../ports/index.js";
+} from "../../src/ports/index.js";
 
 const BOOTSTRAP = "bootstrap-code";
 

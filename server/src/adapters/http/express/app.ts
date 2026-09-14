@@ -29,11 +29,16 @@ export function createApp(container: Container): Express {
       container.services.roster,
       container.services.schedule,
       container.services.results,
+      container.services.playoffs,
+      container.services.suddenDeath,
       container.authMiddleware,
     ),
   );
   api.use("/schedule", scheduleRouter(container.services.schedule, container.authMiddleware));
-  api.use("/matchups", matchupsRouter(container.services.lineups, container.authMiddleware));
+  api.use(
+    "/matchups",
+    matchupsRouter(container.services.lineups, container.services.suddenDeath, container.authMiddleware),
+  );
   api.use(resultsRouter(container.services.results, container.authMiddleware));
   app.use("/api", api);
 

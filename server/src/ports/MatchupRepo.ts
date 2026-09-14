@@ -4,6 +4,7 @@ export type MatchupStatus = "scheduled" | "in_progress" | "final";
 export interface NewMatchup {
   stage: MatchupStage;
   roundIndex: number | null;
+  bracketSlot?: string | null;
   teamAId: string;
   teamBId: string;
 }
@@ -13,6 +14,7 @@ export interface MatchupRecord {
   tournamentId: string;
   stage: MatchupStage;
   roundIndex: number | null;
+  bracketSlot: string | null;
   teamAId: string;
   teamBId: string;
   status: MatchupStatus;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignPairs, shuffle, type Rng } from "./randomAssign.js";
+import { assignPairs, shuffle, type Rng } from "../../src/domain/randomAssign.js";
 
 /** Deterministic RNG that replays a fixed sequence of [0,1) values. */
 function seq(values: number[]): Rng {

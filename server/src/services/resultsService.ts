@@ -134,6 +134,11 @@ export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
     if (result.decided) {
       status = "final";
       winnerTeamId = result.winner === "A" ? matchup.teamAId : matchup.teamBId;
+    } else if (result.allFinal && result.tied) {
+      // A level game tally: round-robin has no tiebreaker, so it's a completed
+      // draw. Playoffs go to sudden death, so the matchup stays open (US12).
+      status = matchup.stage === "round_robin" ? "final" : "in_progress";
+      winnerTeamId = null;
     } else if (result.finalGames > 0) {
       status = "in_progress";
       winnerTeamId = null;
@@ -284,15 +289,19 @@ export function makeResultsService(deps: ResultsServiceDeps): ResultsService {
         deps.matchups.listByTournament(t.id),
         deps.games.listByTournament(t.id),
       ]);
+      // Standings (and playoff seeding) come from round-robin play only.
+      const rrMatchups = matchupViews.filter((m) => m.stage === "round_robin");
+      const rrMatchupIds = new Set(rrMatchups.map((m) => m.id));
       const rows = computeStandings(
         teams.map((team) => ({ id: team.id, name: team.name })),
-        matchupViews.map((m) => ({
+        rrMatchups.map((m) => ({
           id: m.id,
           teamAId: m.teamAId,
           teamBId: m.teamBId,
           winnerTeamId: m.winnerTeamId,
+          status: m.status,
         })),
-        games as GameResultInput[],
+        (games as GameResultInput[]).filter((g) => rrMatchupIds.has(g.matchupId)),
       );
       return { status: t.status, rows };
     },
