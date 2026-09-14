@@ -1,118 +1,126 @@
-import { BrowserRouter, Navigate, Route, Routes, Link } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
+import type { Role } from "./lib/nav";
+import { AppShell } from "./components/layout/AppShell";
+import { Loading } from "./components/ui";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
+import { Home } from "./pages/Home";
 import { Profile } from "./pages/Profile";
-import { Admin } from "./pages/Admin";
-import { Schedule } from "./pages/Schedule";
-import { Lineups } from "./pages/Lineups";
-import { Results } from "./pages/Results";
-import { Standings } from "./pages/Standings";
+import { ComingSoon } from "./pages/ComingSoon";
+import { TournamentHub } from "./pages/tournament/TournamentHub";
+import { Schedule } from "./pages/tournament/Schedule";
+import { Results } from "./pages/tournament/Results";
+import { Standings } from "./pages/tournament/Standings";
+import { Captain } from "./pages/Captain";
+import { AdminHub } from "./pages/admin/AdminHub";
+import { AdminUsers } from "./pages/admin/AdminUsers";
+import { AdminTeams } from "./pages/admin/AdminTeams";
+import { AdminTournaments } from "./pages/admin/AdminTournaments";
+import { AdminSettings } from "./pages/admin/AdminSettings";
 
-function Nav() {
-  const { profile, logout, tournaments, activeTournamentId, setActiveTournament } = useAuth();
-  if (!profile) return null;
+function FullPageLoading() {
   return (
-    <nav style={navStyle}>
-      <Link to="/">Profile</Link>
-      <Link to="/schedule">Schedule</Link>
-      <Link to="/standings">Standings</Link>
-      <Link to="/results">Results</Link>
-      {(profile.role === "captain" || profile.role === "admin") && <Link to="/lineups">Lineups</Link>}
-      {profile.role === "admin" && <Link to="/admin">Admin</Link>}
-      <span style={{ marginLeft: "auto", display: "flex", gap: 12, alignItems: "center" }}>
-        {tournaments.length > 1 ? (
-          <select
-            aria-label="Active tournament"
-            value={activeTournamentId ?? ""}
-            onChange={(e) => setActiveTournament(e.target.value)}
-          >
-            {tournaments.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          tournaments.length === 1 && <span>{tournaments[0]!.name}</span>
-        )}
-        <span>
-          {profile.user.displayName} ({profile.role})
-        </span>
-        <button onClick={() => logout()}>Log out</button>
-      </span>
-    </nav>
+    <div className="flex min-h-screen items-center justify-center">
+      <Loading />
+    </div>
   );
 }
 
-function RequireAuth({ children, adminOnly }: { children: JSX.Element; adminOnly?: boolean }) {
+/** Signed-in only; optionally restricted to certain roles. */
+function RequireAuth({ children, roles }: { children: JSX.Element; roles?: Role[] }) {
   const { profile, loading } = useAuth();
-  if (loading) return <p style={{ padding: 24 }}>Loading…</p>;
+  if (loading) return <FullPageLoading />;
   if (!profile) return <Navigate to="/login" replace />;
-  if (adminOnly && profile.role !== "admin") return <Navigate to="/" replace />;
+  if (roles && !roles.includes(profile.role)) return <Navigate to="/" replace />;
+  return children;
+}
+
+/** Login / signup: bounce already-authenticated users to Home. */
+function PublicOnly({ children }: { children: JSX.Element }) {
+  const { profile, loading } = useAuth();
+  if (loading) return <FullPageLoading />;
+  if (profile) return <Navigate to="/" replace />;
   return children;
 }
 
 function Shell() {
   const { activeTournamentId } = useAuth();
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif" }}>
-      <Nav />
-      {/* Remount routed pages when the active tournament changes so their
-          per-tournament data (US28) refetches on switch. */}
-      <Routes key={activeTournamentId ?? "none"}>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+    // Remount routed pages when the active tournament changes so their
+    // per-tournament data (US28) refetches on switch.
+    <Routes key={activeTournamentId ?? "none"}>
+      <Route
+        path="/login"
+        element={
+          <PublicOnly>
+            <Login />
+          </PublicOnly>
+        }
+      />
+      <Route
+        path="/signup"
+        element={
+          <PublicOnly>
+            <Signup />
+          </PublicOnly>
+        }
+      />
+
+      <Route
+        element={
+          <RequireAuth>
+            <AppShell />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Home />} />
+        <Route path="profile" element={<Profile />} />
+
+        <Route path="tournament" element={<TournamentHub />}>
+          <Route index element={<Navigate to="schedule" replace />} />
+          <Route path="schedule" element={<Schedule />} />
+          <Route path="results" element={<Results />} />
+          <Route path="standings" element={<Standings />} />
+        </Route>
+
         <Route
-          path="/"
+          path="captain"
           element={
-            <RequireAuth>
-              <Profile />
+            <RequireAuth roles={["captain", "admin"]}>
+              <Captain />
             </RequireAuth>
           }
         />
+
         <Route
-          path="/schedule"
+          path="admin"
           element={
-            <RequireAuth>
-              <Schedule />
+            <RequireAuth roles={["admin"]}>
+              <AdminHub />
             </RequireAuth>
           }
-        />
-        <Route
-          path="/standings"
-          element={
-            <RequireAuth>
-              <Standings />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/results"
-          element={
-            <RequireAuth>
-              <Results />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/lineups"
-          element={
-            <RequireAuth>
-              <Lineups />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <RequireAuth adminOnly>
-              <Admin />
-            </RequireAuth>
-          }
-        />
-      </Routes>
-    </div>
+        >
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="teams" element={<AdminTeams />} />
+          <Route path="tournaments" element={<AdminTournaments />} />
+          <Route path="settings" element={<AdminSettings />} />
+        </Route>
+
+        {/* Future phases — placeholders until the features ship (see lib/nav.ts). */}
+        <Route path="leaderboard" element={<ComingSoon />} />
+        <Route path="shop" element={<ComingSoon />} />
+        <Route path="missions" element={<ComingSoon />} />
+
+        {/* Legacy flat routes from the first UI. */}
+        <Route path="schedule" element={<Navigate to="/tournament/schedule" replace />} />
+        <Route path="results" element={<Navigate to="/tournament/results" replace />} />
+        <Route path="standings" element={<Navigate to="/tournament/standings" replace />} />
+        <Route path="lineups" element={<Navigate to="/captain" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }
 
@@ -125,11 +133,3 @@ export function App() {
     </AuthProvider>
   );
 }
-
-const navStyle = {
-  display: "flex",
-  gap: 12,
-  alignItems: "center",
-  padding: "10px 16px",
-  borderBottom: "1px solid #ddd",
-} as const;

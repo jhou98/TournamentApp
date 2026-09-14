@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { AuthLayout } from "../components/layout/AuthLayout";
+import { Alert, Button, Field, Input } from "../components/ui";
 
 export function Signup() {
   const { signup } = useAuth();
@@ -32,40 +34,45 @@ export function Signup() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "3rem auto" }}>
-      <h1>Sign up</h1>
-      <form onSubmit={onSubmit}>
-        <label style={{ display: "block", marginBottom: 8 }}>
-          Username
-          <input value={username} onChange={(e) => setUsername(e.target.value)} style={inputStyle} />
-        </label>
-        <label style={{ display: "block", marginBottom: 8 }}>
-          Display name
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
-        </label>
-        <label style={{ display: "block", marginBottom: 8 }}>
-          Password
-          <input
+    <AuthLayout>
+      <h1 className="text-center text-2xl font-extrabold">Create your account</h1>
+      <p className="mt-1 text-center text-sm text-ink-muted">Join the Friendsgiving tournament</p>
+
+      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <Field label="Username">
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
+        </Field>
+        <Field label="Display name">
+          <Input
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            autoComplete="name"
+            required
+          />
+        </Field>
+        <Field label="Password">
+          <Input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={inputStyle}
+            autoComplete="new-password"
+            required
           />
-        </label>
-        <label style={{ display: "block", marginBottom: 8 }}>
-          Invite code (optional)
-          <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={inputStyle} />
-        </label>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-        <button type="submit" disabled={busy}>
-          {busy ? "…" : "Sign up"}
-        </button>
+        </Field>
+        <Field label="Invite code" hint="Only needed if the commissioner gave you one">
+          <Input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} autoComplete="off" />
+        </Field>
+
+        {error && <Alert tone="error">{error}</Alert>}
+
+        <Button type="submit" disabled={busy} className="w-full">
+          {busy ? "Signing up…" : "Sign up"}
+        </Button>
       </form>
-      <p style={{ marginTop: 16 }}>
-        Already have an account? <Link to="/login">Log in</Link>
+
+      <p className="mt-6 text-center text-sm text-ink-muted">
+        Already have an account? <Link to="/login" className="link">Log in</Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }
-
-const inputStyle = { display: "block", width: "100%", padding: 6, marginTop: 2 } as const;

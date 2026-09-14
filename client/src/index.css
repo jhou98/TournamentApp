@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — the warm "Friendsgiving" palette from artifacts/example-design-25.
+ * Every page and component should use these names (bg-cream, text-ink, border-line,
+ * bg-brand …) rather than raw Tailwind colors so future phases stay consistent.
+ */
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* surfaces */
+  --color-cream: #fbf7f2; /* page background */
+  --color-surface: #ffffff; /* cards */
+  --color-sand: #f6eee4; /* soft warm panel (banner, hover) */
+  --color-sand-2: #efe4d6;
+
+  /* sidebar (dark green-black) */
+  --color-pine: #1f2a22;
+  --color-pine-2: #2b3a2f;
+  --color-pine-3: #35463a;
+  --color-pine-text: #d9d5cc;
+  --color-pine-muted: #8f9a92;
+
+  /* text */
+  --color-ink: #2a2420;
+  --color-ink-muted: #6f655c;
+  --color-ink-faint: #a69c92;
+
+  /* lines */
+  --color-line: #eadfd3;
+  --color-line-strong: #d9cbbb;
+
+  /* brand (burnt orange) + amber accent */
+  --color-brand: #c8501b;
+  --color-brand-hover: #ad4416;
+  --color-brand-soft: #fbe7da;
+  --color-brand-ink: #7a2f0f;
+  --color-amber: #e39a2c;
+  --color-amber-soft: #fdf0d9;
+  --color-amber-ink: #8a5410;
+
+  /* status */
+  --color-success: #2f8f5b;
+  --color-success-soft: #e3f3ea;
+  --color-success-ink: #1d5c3a;
+  --color-danger: #c0392b;
+  --color-danger-soft: #fbe9e7;
+  --color-danger-ink: #7f231a;
+  --color-info: #3b6ea5;
+  --color-info-soft: #e5eef8;
+  --color-info-ink: #24466b;
+
+  --radius-card: 14px;
+  --radius-ctl: 9px;
+
+  --shadow-card: 0 1px 2px rgb(42 36 32 / 0.04), 0 1px 0 rgb(42 36 32 / 0.02);
+  --shadow-pop: 0 10px 30px rgb(42 36 32 / 0.12);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-cream text-ink font-sans antialiased;
+    font-size: 14px;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-bold tracking-tight;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  ::selection {
+    background: var(--color-brand-soft);
+  }
+}
+
+@layer components {
+  /* form controls — shared by every page */
+  .ctl {
+    @apply w-full rounded-ctl border border-line bg-surface px-3 py-2 text-sm text-ink
+      placeholder:text-ink-faint transition
+      focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20
+      disabled:cursor-not-allowed disabled:bg-sand disabled:text-ink-muted;
+  }
+  select.ctl {
+    @apply pr-8 appearance-none bg-no-repeat;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236f655c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+    background-position: right 0.6rem center;
+  }
+  .ctl-sm {
+    @apply px-2 py-1 text-[13px];
+  }
+
+  /* tables */
+  .tbl {
+    @apply w-full border-collapse text-sm;
+  }
+  .tbl th {
+    @apply border-b border-line px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-ink-muted;
+  }
+  .tbl td {
+    @apply border-b border-line/70 px-3 py-2.5 align-middle;
+  }
+  .tbl tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .tbl tbody tr:hover td {
+    @apply bg-sand/40;
+  }
+
+  .link {
+    @apply font-semibold text-brand hover:text-brand-hover hover:underline;
+  }
+}
+
+/* subtle warm gradient used by hero panels */
+.hero-warm {
+  background:
+    radial-gradient(120% 90% at 100% 0%, #fbe1cf 0%, transparent 55%),
+    radial-gradient(80% 80% at 0% 100%, #fdf0d9 0%, transparent 60%),
+    #f8ece0;
+}
+.hero-dark {
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(200, 80, 27, 0.35) 0%, transparent 60%),
+    radial-gradient(80% 80% at 0% 100%, rgba(227, 154, 44, 0.25) 0%, transparent 60%),
+    #1f2a22;
+}

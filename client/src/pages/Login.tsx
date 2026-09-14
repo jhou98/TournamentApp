@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { AuthLayout } from "../components/layout/AuthLayout";
+import { Alert, Button, Field, Input } from "../components/ui";
 
 export function Login() {
   const { login } = useAuth();
@@ -25,32 +27,39 @@ export function Login() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "3rem auto" }}>
-      <h1>Log in</h1>
-      <form onSubmit={onSubmit}>
-        <label style={{ display: "block", marginBottom: 8 }}>
-          Username
-          <input value={username} onChange={(e) => setUsername(e.target.value)} style={inputStyle} />
-        </label>
-        <label style={{ display: "block", marginBottom: 8 }}>
-          Password
-          <input
+    <AuthLayout>
+      <h1 className="text-center text-2xl font-extrabold">Welcome Back</h1>
+      <p className="mt-1 text-center text-sm text-ink-muted">Log in to your account to continue</p>
+
+      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <Field label="Username">
+          <Input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            required
+          />
+        </Field>
+        <Field label="Password">
+          <Input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={inputStyle}
+            autoComplete="current-password"
+            required
           />
-        </label>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-        <button type="submit" disabled={busy}>
-          {busy ? "…" : "Log in"}
-        </button>
+        </Field>
+
+        {error && <Alert tone="error">{error}</Alert>}
+
+        <Button type="submit" disabled={busy} className="w-full">
+          {busy ? "Logging in…" : "Log in"}
+        </Button>
       </form>
-      <p style={{ marginTop: 16 }}>
-        No account? <Link to="/signup">Sign up</Link>
+
+      <p className="mt-6 text-center text-sm text-ink-muted">
+        Don't have an account? <Link to="/signup" className="link">Sign up</Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }
-
-const inputStyle = { display: "block", width: "100%", padding: 6, marginTop: 2 } as const;

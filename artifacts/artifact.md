@@ -10,6 +10,21 @@
 > have landed. **Phase 0 is complete.** Next up: Phase 1 (economy). Owner:
 > @jhou98. Last updated: 2026-09-13.
 >
+> **Changelog (2026-09-13) — UI refresh:** the client was rebuilt on the warm
+> "Friendsgiving" look from `artifacts/example-design-25.png`: **Tailwind v4** (tokens in
+> `client/src/index.css` via `@theme`; shared primitives in `client/src/components/ui.tsx`),
+> a dark **sidebar shell** (`components/layout/AppShell.tsx`, collapses to a drawer on
+> mobile), and a new information architecture — **Home** dashboard at `/` (live banner,
+> stats, recent results, my team, standings snapshot), **Tournament Tracker** at
+> `/tournament/{schedule,results,standings}` (tabbed), **Captain Panel** at `/captain`
+> (was Lineups), **Admin Panel** at `/admin/{users,teams,tournaments,settings}` (tabbed),
+> **Profile** at `/profile`, and a split-hero **Login/Signup**. Old flat routes redirect.
+> **Future phases are wired in already:** `client/src/lib/nav.ts` declares Leaderboard /
+> Shop / Missions as `comingSoon` sidebar entries (muted "Soon" pill + placeholder page) —
+> enabling one is a one-line change; `lib/types.ts` holds the shared API view types for
+> new pages to extend. **No API or server changes.** Part of P3's mobile-friendly goal
+> (US27) lands with this (responsive layouts), the rest of P3 stays open.
+>
 > **Changelog (2026-09-13) — Part 6:** **US28 (multi-tournament) shipped**, scoped
 > to what Phase 0 covers (teams, schedule, scores, results, standings, playoffs) —
 > the **coin-reset minimum bar is intentionally deferred to Phase 1** with the rest of

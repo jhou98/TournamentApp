@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { Button, Input, Pill, Select, TeamChip } from "./ui";
+import { Icon } from "./Icon";
 
 interface Player {
   id: string;
@@ -24,7 +26,7 @@ export interface OvertimeState {
  * `myTeamId` is the team the viewer captains in this matchup, or null.
  *
  * `mode` splits the flow by page:
- *  - "setup"  (Lineups): captains/admin pick representatives; no score entry.
+ *  - "setup"  (Captain Panel): captains/admin pick representatives; no score entry.
  *  - "scoring" (Results): admin enters the 1v1 result; reps shown read-only.
  */
 export function Overtime({
@@ -74,65 +76,88 @@ export function Overtime({
 
   const canPick = (teamId: string) => isAdmin || myTeamId === teamId;
   const bothReps = !!sd.teamA.rep && !!sd.teamB.rep;
-  // Reps are editable only in "setup" mode (Lineups); scoring is Results-only.
+  // Reps are editable only in "setup" mode (Captain Panel); scoring is Results-only.
   const repEditable = (teamId: string) => mode === "setup" && !sd.result && canPick(teamId);
 
   return (
-    <div style={panel}>
-      <strong>⚡ Overtime{sd.result ? " — final" : " — tied"}</strong>
-      <p style={{ fontSize: 13, color: "#666", margin: "4px 0" }}>
+    <div className="rounded-card border border-amber/40 bg-amber-soft/60 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Icon name="bolt" size={16} className="text-amber-ink" />
+        <span className="font-bold">Overtime</span>
+        {sd.result ? (
+          <Pill tone="success">Final</Pill>
+        ) : (
+          <Pill tone="warning">Tied</Pill>
+        )}
+      </div>
+      <p className="mt-1 text-[13px] text-ink-muted">
         1v1, first to 5, win by 2, capped at 7.{" "}
         {mode === "setup"
           ? "Each captain picks one representative here; the result is entered on the Results page."
-          : "Reps are chosen on the Lineups page; an admin enters the result here."}
+          : "Reps are chosen on the Captain Panel; an admin enters the result here."}
       </p>
-      {error && <p style={{ color: "crimson", fontSize: 13 }}>{error}</p>}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+      {error && <p className="mt-1 text-[13px] text-danger-ink">{error}</p>}
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {[sd.teamA, sd.teamB].map((team) => (
-          <div key={team.id} style={{ flex: "1 1 260px" }}>
-            <div style={{ fontWeight: 600 }}>{team.name}</div>
-            {repEditable(team.id) ? (
-              <select
-                value={team.rep?.id ?? ""}
-                onChange={(e) =>
-                  act(() =>
-                    api(`/matchups/${matchupId}/sudden-death/rep`, {
-                      method: "POST",
-                      body: JSON.stringify({ teamId: team.id, userId: e.target.value }),
-                    }),
-                  )
-                }
-              >
-                <option value="">choose rep…</option>
-                {team.eligible.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.displayName}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div style={{ fontSize: 14, color: team.rep ? "#333" : "#999" }}>
-                Rep: {team.rep?.displayName ?? "not chosen yet"}
-              </div>
-            )}
+          <div key={team.id}>
+            <TeamChip name={team.name} bold />
+            <div className="mt-1.5">
+              {repEditable(team.id) ? (
+                <Select
+                  className="ctl-sm"
+                  value={team.rep?.id ?? ""}
+                  onChange={(e) =>
+                    act(() =>
+                      api(`/matchups/${matchupId}/sudden-death/rep`, {
+                        method: "POST",
+                        body: JSON.stringify({ teamId: team.id, userId: e.target.value }),
+                      }),
+                    )
+                  }
+                >
+                  <option value="">choose rep…</option>
+                  {team.eligible.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.displayName}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <div className="text-[13px] text-ink-muted">
+                  Rep: {team.rep?.displayName ?? "not chosen yet"}
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
       {sd.result ? (
-        <p style={{ marginTop: 10, fontWeight: 600 }}>
-          Result: {sd.result.scoreA}–{sd.result.scoreB} · {sd.result.winnerName} advances 🏸
+        <p className="mt-3 font-bold">
+          Result: {sd.result.scoreA}–{sd.result.scoreB} · {sd.result.winnerName} advances
         </p>
       ) : (
         mode === "scoring" &&
         isAdmin && (
-          <div style={{ marginTop: 10, display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 13 }}>{sd.teamA.name}</span>
-            <input value={scoreA} onChange={(e) => setScoreA(e.target.value)} style={num} inputMode="numeric" />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[13px]">{sd.teamA.name}</span>
+            <Input
+              className="ctl-sm w-16 text-center"
+              value={scoreA}
+              onChange={(e) => setScoreA(e.target.value)}
+              inputMode="numeric"
+            />
             <span>–</span>
-            <input value={scoreB} onChange={(e) => setScoreB(e.target.value)} style={num} inputMode="numeric" />
-            <span style={{ fontSize: 13 }}>{sd.teamB.name}</span>
-            <button
+            <Input
+              className="ctl-sm w-16 text-center"
+              value={scoreB}
+              onChange={(e) => setScoreB(e.target.value)}
+              inputMode="numeric"
+            />
+            <span className="text-[13px]">{sd.teamB.name}</span>
+            <Button
+              size="sm"
               disabled={!bothReps || scoreA === "" || scoreB === ""}
               onClick={() =>
                 act(() =>
@@ -144,20 +169,13 @@ export function Overtime({
               }
             >
               Record overtime result
-            </button>
-            {!bothReps && <span style={{ fontSize: 12, color: "#999" }}>reps needed (set on Lineups)</span>}
+            </Button>
+            {!bothReps && (
+              <span className="text-xs text-ink-faint">reps needed (set on Captain Panel)</span>
+            )}
           </div>
         )
       )}
     </div>
   );
 }
-
-const panel = {
-  border: "1px solid #c0392b",
-  background: "#fff7f6",
-  borderRadius: 6,
-  padding: 10,
-  marginTop: 12,
-} as const;
-const num = { width: 44, fontSize: 13, textAlign: "center" as const, padding: "2px 4px" };
