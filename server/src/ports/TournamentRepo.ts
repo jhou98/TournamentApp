@@ -1,4 +1,5 @@
 import type { CoinRule } from "../domain/coinRule.js";
+import type { StreakRule } from "../domain/streak.js";
 
 export interface TournamentRef {
   id: string;
@@ -27,6 +28,7 @@ export interface TournamentConfig {
 export interface TournamentDetail extends TournamentRef, TournamentConfig {
   status: TournamentStatus;
   coinRule: CoinRule;
+  streakRule: StreakRule;
 }
 
 /** Everything needed to create a tournament row (config + the rules JSON blobs). */

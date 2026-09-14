@@ -1,5 +1,6 @@
 import type { TournamentConfig } from "../ports/index.js";
 import type { CoinRule } from "./coinRule.js";
+import type { StreakRule } from "./streak.js";
 
 /**
  * The reference-tournament defaults (§4): 4 teams of 6, 3-round round robin,
@@ -25,7 +26,7 @@ export const DEFAULT_COIN_RULE: CoinRule = {
   closeLossMargin: 3,
 };
 
-export const DEFAULT_STREAK_RULE = {
+export const DEFAULT_STREAK_RULE: StreakRule = {
   direction: "loss",
   tiers: [
     { after: 2, bonus: 25 },

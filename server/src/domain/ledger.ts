@@ -23,8 +23,9 @@ export interface LedgerGameInput {
 export interface DerivedCoinTxn {
   userId: string;
   delta: number;
-  reason: "match_result";
-  gameId: string;
+  reason: "match_result" | "streak_bonus";
+  gameId: string | null;
+  note?: string | null;
 }
 
 /**

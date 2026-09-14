@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeSuddenDeathService, type SuddenDeathService } from "../../src/services/suddenDeathService.js";
 import { ConflictError, ForbiddenError, ValidationError } from "../../src/domain/errors.js";
-import { DEFAULT_COIN_RULE } from "../../src/domain/tournamentDefaults.js";
+import { DEFAULT_COIN_RULE, DEFAULT_STREAK_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   GameRecord,
   GameRepo,
@@ -40,6 +40,7 @@ function detail(): TournamentDetail {
     playoffQualifiers: 2,
     courtCount: 2,
     coinRule: DEFAULT_COIN_RULE,
+    streakRule: DEFAULT_STREAK_RULE,
   };
 }
 

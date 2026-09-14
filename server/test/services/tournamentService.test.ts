@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { makeTournamentService } from "../../src/services/tournamentService.js";
 import { ForbiddenError, NotFoundError, ValidationError } from "../../src/domain/errors.js";
 import type { CoinRule } from "../../src/domain/coinRule.js";
+import type { StreakRule } from "../../src/domain/streak.js";
 import type {
   MembershipRecord,
   MembershipRepo,
@@ -17,8 +18,15 @@ function summary(id: string, name = id): TournamentSummary {
 }
 
 function detailFrom(input: NewTournament, id: string): TournamentDetail {
-  const { name, coinRule, streakRule: _s, suddenDeathRule: _d, ...config } = input;
-  return { id, name, status: "setup", coinRule: coinRule as CoinRule, ...config };
+  const { name, coinRule, streakRule, suddenDeathRule: _d, ...config } = input;
+  return {
+    id,
+    name,
+    status: "setup",
+    coinRule: coinRule as CoinRule,
+    streakRule: streakRule as StreakRule,
+    ...config,
+  };
 }
 
 function fakeTournaments(seed: TournamentSummary[] = []): TournamentRepo & { store: TournamentSummary[] } {

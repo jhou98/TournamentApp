@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { makePlayoffsService, type PlayoffsService } from "../../src/services/playoffsService.js";
 import { ConflictError } from "../../src/domain/errors.js";
-import { DEFAULT_COIN_RULE } from "../../src/domain/tournamentDefaults.js";
+import { DEFAULT_COIN_RULE, DEFAULT_STREAK_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   CourtRepo,
   GameRecord,
@@ -34,6 +34,7 @@ function detail(overrides: Partial<TournamentDetail> = {}): TournamentDetail {
     playoffQualifiers: 4,
     courtCount: 2,
     coinRule: DEFAULT_COIN_RULE,
+    streakRule: DEFAULT_STREAK_RULE,
     ...overrides,
   };
 }
