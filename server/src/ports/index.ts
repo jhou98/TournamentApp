@@ -43,3 +43,10 @@ export type {
   SaveLineupInput,
 } from "./LineupRepo.js";
 export type { SuddenDeathRepo, SuddenDeathRecord } from "./SuddenDeathRepo.js";
+export type {
+  CoinLedgerRepo,
+  CoinTransactionRecord,
+  NewCoinTransaction,
+  CoinBalanceRow,
+  CoinReason,
+} from "./CoinLedgerRepo.js";

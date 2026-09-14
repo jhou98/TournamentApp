@@ -11,6 +11,7 @@ import { makePrismaMatchupRepo } from "../adapters/db/prisma/matchupRepo.js";
 import { makePrismaGameRepo } from "../adapters/db/prisma/gameRepo.js";
 import { makePrismaLineupRepo } from "../adapters/db/prisma/lineupRepo.js";
 import { makePrismaSuddenDeathRepo } from "../adapters/db/prisma/suddenDeathRepo.js";
+import { makePrismaCoinLedgerRepo } from "../adapters/db/prisma/coinLedgerRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -56,6 +57,8 @@ export function buildContainer(env: Env): Container {
   const gamesRepo = makePrismaGameRepo();
   const lineups = makePrismaLineupRepo();
   const suddenDeathRepo = makePrismaSuddenDeathRepo();
+  // Not yet consumed by any service — Commit 3 wires this into the coin-earning use-case.
+  const coinLedger = makePrismaCoinLedgerRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();

@@ -40,6 +40,16 @@ enum GameStatus {
   final
 }
 
+enum CoinReason {
+  match_result
+  streak_bonus
+  mission
+  bounty
+  event
+  purchase
+  admin_adjust
+}
+
 // --- Core tables (Phase 0) ------------------------------------------------
 
 model User {
@@ -58,6 +68,7 @@ model User {
   pairAppearances  PairPlayer[]
   suddenDeathAsA   SuddenDeath[]  @relation("SuddenDeathTeamARep")
   suddenDeathAsB   SuddenDeath[]  @relation("SuddenDeathTeamBRep")
+  coinTransactions CoinTransaction[]
 
   @@map("user")
 }
@@ -97,9 +108,10 @@ model Tournament {
 
   createdAt DateTime @default(now())
 
-  teams    Team[]
-  matchups Matchup[]
-  courts   Court[]
+  teams            Team[]
+  matchups         Matchup[]
+  courts           Court[]
+  coinTransactions CoinTransaction[]
 
   @@map("tournament")
 }
@@ -268,4 +280,26 @@ model SuddenDeath {
   winnerTeam Team?   @relation("SuddenDeathWinner", fields: [winnerTeamId], references: [id])
 
   @@map("sudden_death")
+}
+
+model CoinTransaction {
+  id           String     @id @default(cuid())
+  tournamentId String
+  userId       String
+  delta        Int
+  reason       CoinReason
+  // Forward references to tables that arrive in later commits — plain nullable
+  // scalars for now (no FK relation until those models exist).
+  gameId       String?
+  bountyId     String?
+  missionId    String?
+  purchaseId   String?
+  note         String?
+  createdAt    DateTime   @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@index([tournamentId, userId])
+  @@map("coin_transaction")
 }
