@@ -46,6 +46,8 @@ export interface AuthServiceDeps {
   hasher: PasswordHasher;
   tokens: TokenService;
   bootstrapAdminCode: string;
+  /** Shared code required for self-serve signup (anti-spam gate). */
+  registrationCode: string;
 }
 
 export interface AuthService {
@@ -67,23 +69,30 @@ export function makeAuthService(deps: AuthServiceDeps): AuthService {
         throw new ConflictError("Username is already taken");
       }
 
+      // Every signup must present a code (anti-spam gate): the admin bootstrap
+      // code, the shared registration code, or a valid single-use invite.
+      const code = cmd.inviteCode?.trim();
+      if (!code) {
+        throw new ValidationError("A registration code is required to sign up");
+      }
+
       let isAdmin = false;
       let inviteIdToConsume: string | null = null;
 
-      if (cmd.inviteCode) {
-        if (cmd.inviteCode === deps.bootstrapAdminCode) {
-          isAdmin = true;
-        } else {
-          const invite = await deps.invites.findByCode(cmd.inviteCode);
-          if (!invite || invite.usedBy) {
-            throw new ValidationError("Invalid or already-used invite code");
-          }
-          if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) {
-            throw new ValidationError("Invite code has expired");
-          }
-          isAdmin = invite.grantsAdmin;
-          inviteIdToConsume = invite.id;
+      if (code === deps.bootstrapAdminCode) {
+        isAdmin = true;
+      } else if (code === deps.registrationCode) {
+        isAdmin = false;
+      } else {
+        const invite = await deps.invites.findByCode(code);
+        if (!invite || invite.usedBy) {
+          throw new ValidationError("Invalid or already-used code");
         }
+        if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) {
+          throw new ValidationError("Code has expired");
+        }
+        isAdmin = invite.grantsAdmin;
+        inviteIdToConsume = invite.id;
       }
 
       const passwordHash = await deps.hasher.hash(cmd.password);

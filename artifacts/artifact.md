@@ -403,7 +403,9 @@ the streak bonus. Default numbers are data; the *interface* is what's fixed.
 - First admin signs up with the `BOOTSTRAP_ADMIN_CODE` (set at deploy).
 - An admin can **directly promote/demote any user** (`PATCH /api/admin/users/:id` → `is_admin`) and
   can **mint `signup_invite` codes** (`grants_admin = true`) so people sign up already-admin.
-- Regular sign-up creates a normal user.
+- **Regular sign-up is gated by a shared `REGISTRATION_CODE`** (set at deploy, anti-spam) — every
+  signup must present a valid code: the `BOOTSTRAP_ADMIN_CODE` (→ admin), the `REGISTRATION_CODE`
+  (→ normal user), or a single-use `signup_invite`. A signup with no/invalid code is rejected.
 
 > **Deferred — password management (future phase, D18).** Passwords are stored only as bcrypt
 > hashes and are **never viewable** by anyone (design invariant, not a gap). Two write flows are
@@ -453,7 +455,7 @@ team, and captain.
 ## 6. API surface (P0 — illustrative)
 
 ```
-POST   /api/auth/signup            {username, password, display_name, invite_code?}
+POST   /api/auth/signup            {username, password, display_name, invite_code}  // code required (registration/admin/invite)
 POST   /api/auth/login             -> session
 POST   /api/auth/logout
 GET    /api/me                     -> user + team + role
@@ -563,7 +565,7 @@ between captains → lineups → randomized matchups → results → standings �
 ### Resolved
 | # | Decision | Resolution |
 |---|----------|-----------|
-| **D1** | Admin identity | **`is_admin` role on a user.** First admin via `BOOTSTRAP_ADMIN_CODE`. Admins can **promote/demote users** (`PATCH /api/admin/users/:id`) **and** mint `signup_invite` codes (`grants_admin`). Regular signup = normal user. |
+| **D1** | Admin identity | **`is_admin` role on a user.** First admin via `BOOTSTRAP_ADMIN_CODE`. Admins can **promote/demote users** (`PATCH /api/admin/users/:id`) **and** mint `signup_invite` codes (`grants_admin`). Regular signup requires the shared `REGISTRATION_CODE` (anti-spam gate). |
 | **D2** | Team structure | **Flat teams** — one captain + members, **no sub-teams**. `team_count` and `team_size` are **config** (defaults 4 / 6, validated as a range). *Supersedes the old bounded-tree design (old D2/D11–D14, removed).* |
 | **D3** | Roster assignment | **Admin assigns** players to teams and names **one captain** per team; optional **auto-balance** from the player pool. No self-join codes. |
 | **D4** | Coin earning | **Pluggable rule** (config + pure `computeCoinDelta`), credited **per player**. Default from the brief: win 100 / close-loss 75 / loss 50 — admin-tunable. |
@@ -686,7 +688,7 @@ client/src/         React + Vite SPA
   `?sslmode=require` (harden to `verify-full` + the RDS global CA bundle later).
 - **Backup:** RDS automated backups / snapshots (point-in-time restore within the retention window);
   optional nightly `pg_dump` → gzip → private S3 bucket for an off-provider copy.
-- **Config/secrets:** held in **Secrets Manager** (RDS creds + `JWT_SECRET` + `BOOTSTRAP_ADMIN_CODE`);
+- **Config/secrets:** held in **Secrets Manager** (RDS creds + `JWT_SECRET` + `BOOTSTRAP_ADMIN_CODE` + `REGISTRATION_CODE`);
   the box reads them at deploy time and writes `server/.env`. No DB password lives in the repo.
 - **Deploy:** GitHub Actions builds a release, stages it in a private S3 bucket, and runs it onto the
   box via **SSM Run Command** (fetch → `prisma migrate deploy` → restart). See `infra/`.

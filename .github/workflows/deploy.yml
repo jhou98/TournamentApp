@@ -8,7 +8,7 @@ name: Deploy to AWS
 # set these as environment-scoped variables/secrets on each of prod/staging/dev
 # (see infra/README.md):
 #   Variables: AWS_REGION, AWS_DEPLOY_ROLE_ARN
-#   Secrets:   BOOTSTRAP_ADMIN_CODE
+#   Secrets:   BOOTSTRAP_ADMIN_CODE, REGISTRATION_CODE
 on:
   workflow_dispatch:
     inputs:
@@ -65,11 +65,13 @@ jobs:
           AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           AWS_REGION: ${{ vars.AWS_REGION }}
           BOOTSTRAP_ADMIN_CODE: ${{ secrets.BOOTSTRAP_ADMIN_CODE }}
+          REGISTRATION_CODE: ${{ secrets.REGISTRATION_CODE }}
         run: |
           set -e
           [ -n "$AWS_DEPLOY_ROLE_ARN" ] || { echo "::error::Missing variable AWS_DEPLOY_ROLE_ARN for '${{ inputs.environment }}' (deploy the OIDC stack first)."; exit 1; }
           [ -n "$AWS_REGION" ] || { echo "::error::Missing variable AWS_REGION for '${{ inputs.environment }}'."; exit 1; }
           [ -n "$BOOTSTRAP_ADMIN_CODE" ] || { echo "::error::Missing secret BOOTSTRAP_ADMIN_CODE for '${{ inputs.environment }}'."; exit 1; }
+          [ -n "$REGISTRATION_CODE" ] || { echo "::error::Missing secret REGISTRATION_CODE for '${{ inputs.environment }}'."; exit 1; }
 
       - uses: actions/checkout@v4
         with:
@@ -119,7 +121,8 @@ jobs:
             -c env=${{ inputs.environment }} \
             --require-approval never \
             --outputs-file cdk-outputs.json \
-            --parameters "BootstrapAdminCode=${{ secrets.BOOTSTRAP_ADMIN_CODE }}"
+            --parameters "BootstrapAdminCode=${{ secrets.BOOTSTRAP_ADMIN_CODE }}" \
+            --parameters "RegistrationCode=${{ secrets.REGISTRATION_CODE }}"
       - name: Read stack outputs
         id: outputs
         working-directory: infra
@@ -164,6 +167,7 @@ jobs:
           DB_SECRET_ARN: ${{ steps.outputs.outputs.db_secret_arn }}
           APP_SECRET_ARN: ${{ steps.outputs.outputs.app_secret_arn }}
           APP_PORT: ${{ steps.outputs.outputs.app_port }}
+          APP_ENV: ${{ inputs.environment }}
         run: |
           set -euo pipefail
 
@@ -181,6 +185,7 @@ jobs:
           export DB_SECRET_ARN="$DB_SECRET_ARN"
           export APP_SECRET_ARN="$APP_SECRET_ARN"
           export APP_PORT="$APP_PORT"
+          export APP_ENV="$APP_ENV"
           aws s3 cp "s3://\$ARTIFACT_BUCKET/\$ARTIFACT_KEY" /tmp/bootstrap.tar.gz --region "\$AWS_REGION"
           rm -rf /tmp/bootstrap && mkdir -p /tmp/bootstrap
           tar -xzf /tmp/bootstrap.tar.gz -C /tmp/bootstrap infra/scripts/deploy-on-box.sh

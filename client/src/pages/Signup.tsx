@@ -23,7 +23,7 @@ export function Signup() {
         username,
         password,
         displayName,
-        inviteCode: inviteCode.trim() || undefined,
+        inviteCode: inviteCode.trim(),
       });
       navigate("/");
     } catch (err) {
@@ -59,8 +59,8 @@ export function Signup() {
             required
           />
         </Field>
-        <Field label="Invite code" hint="Only needed if the commissioner gave you one">
-          <Input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} autoComplete="off" />
+        <Field label="Registration code" hint="Ask the commissioner for the code (or use your personal invite)">
+          <Input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} autoComplete="off" required />
         </Field>
 
         {error && <Alert tone="error">{error}</Alert>}

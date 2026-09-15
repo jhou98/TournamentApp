@@ -27,6 +27,12 @@ export class InfrastructureStack extends cdk.Stack {
       minLength: 8,
       description: "First-admin signup code (BOOTSTRAP_ADMIN_CODE), stored in Secrets Manager.",
     });
+    const registrationCode = new cdk.CfnParameter(this, "RegistrationCode", {
+      type: "String",
+      noEcho: true,
+      minLength: 8,
+      description: "Shared signup code (REGISTRATION_CODE) gating registration, stored in Secrets Manager.",
+    });
 
     const vpc = new ec2.Vpc(this, "Vpc", {
       maxAzs: 2,
@@ -56,10 +62,11 @@ export class InfrastructureStack extends cdk.Stack {
 
     const appSecret = new secretsmanager.Secret(this, "AppSecret", {
       secretName: `${appName}/${environment}/app`,
-      description: "App secrets: JWT_SECRET (generated) and BOOTSTRAP_ADMIN_CODE (provided).",
+      description: "App secrets: JWT_SECRET (generated), BOOTSTRAP_ADMIN_CODE + REGISTRATION_CODE (provided).",
       generateSecretString: {
         secretStringTemplate: this.toJsonString({
           BOOTSTRAP_ADMIN_CODE: bootstrapAdminCode.valueAsString,
+          REGISTRATION_CODE: registrationCode.valueAsString,
         }),
         generateStringKey: "JWT_SECRET",
         passwordLength: 48,
