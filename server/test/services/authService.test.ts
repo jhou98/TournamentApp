@@ -14,6 +14,7 @@ import type {
 } from "../../src/ports/index.js";
 
 const BOOTSTRAP = "bootstrap-code";
+const REGISTRATION = "registration-code";
 
 function fakeUserRepo(): UserRepo & { store: UserRecord[] } {
   const store: UserRecord[] = [];
@@ -135,6 +136,7 @@ function build(overrides?: {
     hasher: fakeHasher,
     tokens: fakeTokens,
     bootstrapAdminCode: BOOTSTRAP,
+    registrationCode: REGISTRATION,
   });
 }
 
@@ -145,13 +147,26 @@ describe("authService.signup", () => {
     users = fakeUserRepo();
   });
 
-  it("creates a normal user without a code", async () => {
+  it("creates a normal user with the registration code", async () => {
     const auth = build({ users });
-    const result = await auth.signup({ username: "alice", password: "password123", displayName: "Alice" });
+    const result = await auth.signup({
+      username: "alice",
+      password: "password123",
+      displayName: "Alice",
+      inviteCode: REGISTRATION,
+    });
     expect(result.role).toBe("player");
     expect(result.user.isAdmin).toBe(false);
     expect(result.token).toBe(`tok:${result.user.id}`);
     expect(users.store[0]!.passwordHash).toBe("hashed:password123");
+  });
+
+  it("rejects a signup with no code (anti-spam gate)", async () => {
+    const auth = build({ users });
+    await expect(
+      auth.signup({ username: "bot", password: "password123", displayName: "Bot" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(users.store).toHaveLength(0);
   });
 
   it("creates an admin with the bootstrap code", async () => {
@@ -183,9 +198,9 @@ describe("authService.signup", () => {
 
   it("rejects a duplicate username", async () => {
     const auth = build({ users });
-    await auth.signup({ username: "dup", password: "password123", displayName: "Dup" });
+    await auth.signup({ username: "dup", password: "password123", displayName: "Dup", inviteCode: REGISTRATION });
     await expect(
-      auth.signup({ username: "dup", password: "password123", displayName: "Dup2" }),
+      auth.signup({ username: "dup", password: "password123", displayName: "Dup2", inviteCode: REGISTRATION }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
@@ -219,7 +234,7 @@ describe("authService.login", () => {
   it("returns a token on valid credentials", async () => {
     const users = fakeUserRepo();
     const auth = build({ users });
-    await auth.signup({ username: "alice", password: "password123", displayName: "Alice" });
+    await auth.signup({ username: "alice", password: "password123", displayName: "Alice", inviteCode: REGISTRATION });
     const result = await auth.login({ username: "alice", password: "password123" });
     expect(result.user.username).toBe("alice");
     expect(result.token).toBe(`tok:${result.user.id}`);
@@ -228,7 +243,7 @@ describe("authService.login", () => {
   it("rejects a wrong password", async () => {
     const users = fakeUserRepo();
     const auth = build({ users });
-    await auth.signup({ username: "alice", password: "password123", displayName: "Alice" });
+    await auth.signup({ username: "alice", password: "password123", displayName: "Alice", inviteCode: REGISTRATION });
     await expect(auth.login({ username: "alice", password: "wrong" })).rejects.toBeInstanceOf(
       UnauthorizedError,
     );

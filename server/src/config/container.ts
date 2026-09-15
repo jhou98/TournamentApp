@@ -77,6 +77,7 @@ export function buildContainer(env: Env): Container {
     hasher,
     tokens,
     bootstrapAdminCode: env.BOOTSTRAP_ADMIN_CODE,
+    registrationCode: env.REGISTRATION_CODE,
   });
 
   const tournamentService = makeTournamentService({ tournaments, memberships });

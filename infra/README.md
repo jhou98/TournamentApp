@@ -72,9 +72,14 @@ Then configure the matching **GitHub Environment** (Settings → Environments �
 | Variable | `AWS_REGION`           | e.g. `us-east-1`                                     |
 | Variable | `AWS_DEPLOY_ROLE_ARN`  | the `DeployRoleArn` output from the OIDC stack      |
 | Secret   | `BOOTSTRAP_ADMIN_CODE` | the first-admin signup code (min 8 chars)           |
+| Secret   | `REGISTRATION_CODE`    | the shared signup code gating registration (min 8 chars) |
 
 > The artifacts bucket is `tournamentapp-<env>-artifacts-<accountId>`, which the deploy role's S3
 > policy is scoped to. If you change `appName` (via `-c appName=...`), keep it consistent everywhere.
+
+> `BOOTSTRAP_ADMIN_CODE` and `REGISTRATION_CODE` are written into the app secret
+> (`tournamentapp/<env>/app`) only on **first** creation. Changing the GitHub secret later won't
+> overwrite the stored value — update it directly in Secrets Manager (then redeploy to pick it up).
 
 ## Deploying
 
