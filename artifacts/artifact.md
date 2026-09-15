@@ -512,16 +512,18 @@ POST   /api/admin/coins/adjust          manual adjust/reverse {user_id, delta, n
 | Language | **TypeScript** (front + back) | Type-safe repos/services make the portability seams (§11) real, not aspirational |
 | Frontend | **React + Vite** | Fast, simple, static build |
 | Backend | **Node + Express** (thin adapter) | Express is only the HTTP edge; business logic stays framework-free — see §11 |
-| DB | **Postgres via Prisma ORM** — **Neon** free tier (managed, serverless) | Relational fits the model; **already the serverless-ready DB** so there's no future migration; used as plain Postgres (not Neon-specific features) to stay portable |
+| DB | **Postgres via Prisma ORM** — **Aurora Serverless v2** (Postgres-compatible), AWS free tier | Relational fits the model; **in-region with the EC2 box** (low-latency reads/writes, no public-internet hop); free tier is **~1 GB** (vs Neon's 0.5 GB); used as plain Postgres so it stays portable |
 | Validation | **zod** | One schema per input, reusable from an Express route or a future Lambda handler |
 | Auth | bcrypt + JWT in httpOnly cookie | Stateless → same handler works on a box or on Lambda (D5) |
 
 **Deployment = Option ①** (chosen): single **stateless** box serving API + SPA, with a **managed
-Neon Postgres** behind Prisma, **coded for serverless portability** (D15). **AWS free-tier shape:** one
-**EC2 t3.micro** (12-mo free) or **Lightsail** (~$5/mo flat) running the Node server, which also serves
-the built React app (no CORS, one deploy artifact). Data lives in **Neon** (off-AWS, free tier), so the
-box holds no state and is disposable; backups are the managed DB's job (+ optional `pg_dump`). Full
-request flow, deploy, and local-dev story in **§11**.
+Aurora Serverless v2 Postgres** behind Prisma, **coded for serverless portability** (D15). **AWS
+free-tier shape:** one **EC2 t3.micro** (12-mo free) running the Node server, which also serves the
+built React app (no CORS, one deploy artifact), talking to **Aurora Serverless v2 in the same
+region/VPC** (free tier, ~1 GB) over the private network. Data lives in Aurora, so the box holds no
+state and is disposable; backups are the managed DB's job (+ optional `pg_dump`). Keeping the DB
+in-region with the box removes the public-internet hop Neon incurred. Full request flow, remote
+infra setup, deploy, and local-dev story in **§11**.
 
 ---
 
@@ -542,6 +544,14 @@ between captains → lineups → randomized matchups → results → standings �
   tournament-wide events.
 - **Phase 3 (P3 — polish):** live dashboard, captain dashboard, activity/history view,
   animations, mobile-friendly UI. *(Notifications out of scope.)*
+- **Phase D (Deploy — hosted infra):** stand up the hosted solution per §11's *Remote infra setup* —
+  one-region VPC with split app/DB security groups, an **Aurora Serverless v2 (Postgres)** cluster
+  (private, ~1 GB free tier) + app DB user, an **EC2 t3.micro** box (Node 20, `pm2`/`systemd`, Caddy
+  for HTTPS) pointed at the Aurora writer endpoint (`sslmode=require`), `db:migrate` + `db:seed` to
+  bootstrap, and DNS/TLS to a domain. Add the deploy step (git pull → build → `db:migrate` →
+  `pm2 reload`) and confirm `/api/health` returns `{"status":"ok","db":"up"}` from the box. **Runs any
+  time after Phase 0** (once there's a working engine worth hosting) and is re-run/kept current as later
+  phases ship — it's orthogonal to the P1–P3 feature work. Not started yet (no infra provisioned).
 
 ---
 
@@ -557,12 +567,12 @@ between captains → lineups → randomized matchups → results → standings �
 | **D5** | Auth transport | httpOnly cookie + JWT. |
 | **D6** | Tournament scope | **Multi-tournament (US28).** Admin creates/manages many tournaments; every row already carries `tournament_id`, so the work is a tournament CRUD surface + replacing the "current tournament" `findFirst` with an explicit active-tournament id per request + membership-based access (a user sees a tournament only if they're on a team in it; admins see all). **Coins/economy scope by `tournament_id` too** (add it to `coin_transaction`), and an admin can **reset a tournament's coin balances**. *(Supersedes the earlier "one tournament, multi-tournament dropped" call — kept single only through Parts 0–4.)* **Open-join / self-serve invites stay out of scope** (admin assigns rosters, D3). |
 | **D7** | Coin scope | **Per player** (individual balances), not per team. |
-| **D8** | DB/ORM | **Prisma + Postgres on Neon** (free tier, managed). Docker Postgres locally → clean migrations. Plain Postgres to stay portable (Neon↔Supabase↔RDS). |
-| **D9** | Hosting | **Stateless box** (EC2 free-tier / Lightsail) serves API + SPA; data in **Neon**. Box is disposable. |
+| **D8** | DB/ORM | **Updated 2026-09-14 — Aurora Serverless v2 (Postgres) on the AWS free tier**, replacing Neon. **Prisma + Postgres**, Docker Postgres locally → clean migrations, plain Postgres to stay portable (Aurora↔RDS↔Supabase↔Neon). Rationale: the DB now sits **in-region/in-VPC with the EC2 box** (lower latency, no public-internet hop) and the free tier is larger (~1 GB vs Neon's 0.5 GB). *(Supersedes "Prisma + Postgres on Neon".)* |
+| **D9** | Hosting | **Stateless box** (EC2 free-tier) serves API + SPA; data in **Aurora Serverless v2** in the same region/VPC. Box is disposable. *(Updated 2026-09-14 — was "data in Neon"; Lightsail dropped as the box in favor of EC2 co-located with Aurora.)* |
 | **D10** | Powerups affect standings? | **No** — `restrictions_meta`/effect notes only; admin applies effects manually. |
 | **D11** | Matchup & bracket structure | **All config.** A matchup = `rounds_per_matchup` × `pairs_per_lineup` games; winner = most game wins; an even split → sudden death. Round robin generates via the **circle method** from `team_count`; playoffs are a **seeded single-elim** of the top `playoff_qualifiers`. |
 | **D12** | Random matchup assignment | System **randomly pairs** home↔away pairs once **both** lineups for a round lock; the assignment is **immutable + recorded**. Captains never pick the opposing pair (re-run only before games start, on a technical fault). |
-| **D15** | Deployment architecture | **Option ① — stateless box + managed Neon Postgres**, coded for serverless portability (ports & adapters, §11). Serverless port is **compute-only** (Lambda + API Gateway) — no DB migration. |
+| **D15** | Deployment architecture | **Option ① — stateless box + managed Aurora Serverless v2 Postgres (same region/VPC)**, coded for serverless portability (ports & adapters, §11). Serverless port is **compute-only** (Lambda + API Gateway) — no DB migration. *(Updated 2026-09-14 — was managed Neon Postgres.)* |
 | **D16** | Streak bonus direction | **Both, configurable** via `streak_rule.direction` (`loss` \| `win` \| `both`). Losing-streak protection default from the source doc (+25/+50/+75 at 2/3/4+ losses); win-streak reward uses the same tiered shape. A streak resets when the run breaks. Amounts/tiers admin-tunable. |
 | **D17** | Bounty / mission completion | **Admin marks complete.** Commissioner/admin confirms a bounty or mission was earned, which writes the coin credit. (Auto-detection of common bounty conditions can be added later.) |
 | **D18** | Password management | **Deferred to a later phase (P3 account settings).** Passwords are bcrypt-hashed and never viewable. Self-service change password (`POST /api/me/password`) and admin reset (`POST /api/admin/users/:id/password`) are planned but intentionally not in Phase 0. See §5. |
@@ -585,8 +595,9 @@ between captains → lineups → randomized matchups → results → standings �
 
 ## 11. Technical architecture
 
-**Decision (D15):** ship as a single always-on box + managed Neon Postgres (Option ①), but structure
-the code as **ports & adapters (hexagonal)** so a later move to serverless swaps the *edges*, not the core.
+**Decision (D15):** ship as a single always-on box + managed Aurora Serverless v2 Postgres in the same
+region/VPC (Option ①), but structure the code as **ports & adapters (hexagonal)** so a later move to
+serverless swaps the *edges*, not the core.
 
 ### Layers
 
@@ -599,7 +610,7 @@ flowchart TB
     PORT["Repository ports (interfaces)\nUserRepo · TeamRepo · GameRepo · LedgerRepo ..."]
   end
   HTTP["HTTP adapter — Express routes + middleware\n(thin: request -> command -> response)"]
-  DB["DB adapter — Prisma → Postgres (Neon)\n(implements the ports)"]
+  DB["DB adapter — Prisma → Postgres (Aurora Serverless v2)\n(implements the ports)"]
   FE -->|"HTTPS /api/*"| HTTP --> SVC
   SVC --> DOM
   SVC --> PORT
@@ -610,9 +621,10 @@ The two edges are the only AWS/framework-aware parts:
 - **HTTP adapter** (Express today) maps a request → a plain command, calls a service, maps the result
   or a domain error → an HTTP response. A future **Lambda handler** does the same mapping from an API
   Gateway event and calls the *same* service.
-- **DB adapter** (Prisma + Postgres today, hosted on **Neon**) implements the repository ports. The DB
-  is **already Postgres**, so no migration is needed to go serverless — moving Neon → RDS/Supabase is
-  just a connection string. A DynamoDB adapter would implement the same interfaces if ever wanted.
+- **DB adapter** (Prisma + Postgres today, hosted on **Aurora Serverless v2**) implements the repository
+  ports. The DB is **already Postgres**, so no migration is needed to go serverless — moving Aurora →
+  RDS/Supabase/Neon is just a connection string. A DynamoDB adapter would implement the same interfaces
+  if ever wanted.
 
 ### Folder shape
 
@@ -622,7 +634,7 @@ server/src/
   services/        use-cases; depend on ports only; never import express/prisma
   ports/           repository + unit-of-work interfaces
   adapters/
-    db/prisma/      Prisma repo implementations (Postgres via Neon)
+    db/prisma/      Prisma repo implementations (Postgres via Aurora Serverless v2)
     http/express/   routes + middleware (auth, error mapping) + static serving
     http/lambda/    (future) API Gateway handlers — reuse services verbatim
   config/          env loading + composition root (wires concrete repos into services)
@@ -659,24 +671,50 @@ client/src/         React + Vite SPA
 
 - **Build:** `client` → static `dist`; `server` → compiled JS. Express serves `/api/*` and falls back
   to `client/dist/index.html` for SPA routes.
-- **Host:** one EC2 t3.micro (free 12-mo) or Lightsail (~$5/mo), Node 20+, under `pm2` or `systemd`.
-  **Caddy** in front for automatic HTTPS (Let's Encrypt) → reverse-proxy to Node. The box is
-  **stateless** → replaceable at will, since data lives in Neon.
-- **DB:** managed **Neon Postgres**. Prisma uses the **pooled** connection string at runtime
-  (Neon's PgBouncer endpoint) and the **direct** connection for `migrate`. Neon auto-resumes on
-  connect after idle.
-- **Backup:** handled by Neon (point-in-time within the free-tier window); optional nightly
-  `pg_dump` → gzip → private S3 bucket for an off-provider copy.
+- **Host:** one EC2 t3.micro (free 12-mo), Node 20+, under `pm2` or `systemd`. **Caddy** in front for
+  automatic HTTPS (Let's Encrypt) → reverse-proxy to Node. The box is **stateless** → replaceable at
+  will, since data lives in Aurora.
+- **DB:** managed **Aurora Serverless v2 (PostgreSQL-compatible)** in the **same region/VPC** as the
+  box, so DB traffic stays on the private network (no public-internet hop, low latency). Prisma points
+  **both** `DATABASE_URL` and `DIRECT_URL` at the **cluster writer endpoint** — Aurora has no
+  Neon-style pooled/direct split, and the single always-on box's connection count is small enough for
+  Prisma's own pool (RDS Proxy is an optional later add for many concurrent Lambdas, not free-tier). TLS
+  is required: append `?sslmode=require` (harden to `verify-full` + the RDS global CA bundle later).
+  Aurora Serverless v2 can scale its min capacity down when idle; the writer endpoint stays stable.
+- **Backup:** Aurora automated backups / snapshots (point-in-time restore within the retention window);
+  optional nightly `pg_dump` → gzip → private S3 bucket for an off-provider copy.
 - **Config/secrets:** `.env` on the box (`DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`,
-  `BOOTSTRAP_ADMIN_CODE`). Later → SSM/Secrets Manager.
-- **Deploy:** a small script (git pull → build → `pm2 reload`) or a GitHub Action over SSH. Keep it
-  minimal for v1.
+  `BOOTSTRAP_ADMIN_CODE`). Later → SSM/Secrets Manager. The Aurora master password lives only in the
+  connection string / Secrets Manager, never in the repo.
+- **Deploy:** a small script (git pull → build → `npm run db:migrate` → `pm2 reload`) or a GitHub
+  Action over SSH. Keep it minimal for v1.
+
+### Remote infra setup (first-time provisioning)
+
+Not provisioned yet — this is the target shape to stand up once (console or IaC). All resources live in
+**one region** so the box and DB are co-located.
+
+1. **Network:** a VPC (the account default works) with the EC2 box and the Aurora cluster in the same
+   VPC. **Two security groups:** `sg-app` on the box (inbound 443/80 from the internet, 22 from your IP)
+   and `sg-db` on Aurora (inbound **5432 only from `sg-app`**, nothing public). The DB is **not**
+   publicly accessible.
+2. **Aurora Serverless v2 cluster:** engine *Aurora PostgreSQL*, capacity **Serverless v2** with a low
+   min ACU (e.g. 0.5) for the free tier, a single writer instance, in the private subnets, attached to
+   `sg-db`. Create the `tournament` database and an app DB user (least-privilege, not the master).
+3. **EC2 t3.micro:** Amazon Linux/Ubuntu, `sg-app`, Node 20, `pm2`/`systemd`, Caddy for HTTPS. Put the
+   Aurora **writer endpoint** + app-user creds into `server/.env` (`?sslmode=require`).
+4. **Bootstrap the schema:** from the box, `npm run db:migrate` (Prisma migrate deploy) then
+   `npm run db:seed` for the default tournament + bootstrap admin.
+5. **DNS/TLS:** point the domain at the box's Elastic IP; Caddy issues the Let's Encrypt cert.
+
+Free-tier notes: EC2 t3.micro is 12-mo free; Aurora Serverless v2 storage is ~1 GB under the current
+AWS free tier (larger than Neon's 0.5 GB) — watch ACU-hours and storage in Billing to stay in-tier.
 
 ### Local dev
 
 - `npm run dev` → Vite (frontend, proxies `/api` → local server) + Express (`tsx watch`).
-- **Postgres locally too** — one `docker compose up` for a local Postgres (or a Neon dev branch), so
-  the provider matches prod and migrations stay clean.
+- **Postgres locally too** — one `docker compose up` for a local Postgres, so the engine matches prod
+  and migrations stay clean.
 - Prisma migrations via `prisma migrate dev`; a `seed` script creates the bootstrap admin + a default
   tournament + demo teams.
 - Same server + same **Postgres engine** as prod → **local == prod**.
@@ -685,6 +723,6 @@ client/src/         React + Vite SPA
 
 Because the DB is already Postgres, the move is **compute-only**: (a) add `adapters/http/lambda/`
 handlers that call the existing services; (b) add a Lambda composition root; (c) front with API
-Gateway; (d) host the SPA on S3/CloudFront; (e) point `DATABASE_URL` at the same Neon (or RDS) via its
-pooled endpoint. **`domain/`, `services/`, `ports/`, and the DB don't change** — that's the
-portability D15 buys.
+Gateway; (d) host the SPA on S3/CloudFront; (e) point `DATABASE_URL` at the **same Aurora cluster**
+(via RDS Proxy for Lambda connection pooling). **`domain/`, `services/`, `ports/`, and the DB don't
+change** — that's the portability D15 buys.
