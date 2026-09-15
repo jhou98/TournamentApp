@@ -50,3 +50,4 @@ export type {
   CoinBalanceRow,
   CoinReason,
 } from "./CoinLedgerRepo.js";
+export type { BountyRepo, BountyRecord, NewBounty, BountyTargetType } from "./BountyRepo.js";

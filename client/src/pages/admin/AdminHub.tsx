@@ -11,6 +11,7 @@ export function AdminHub() {
           { to: "/admin/users", label: "Users" },
           { to: "/admin/teams", label: "Teams" },
           { to: "/admin/coins", label: "Coins" },
+          { to: "/admin/bounties", label: "Bounties" },
           { to: "/admin/tournaments", label: "Tournaments" },
           { to: "/admin/settings", label: "Settings" },
         ]}

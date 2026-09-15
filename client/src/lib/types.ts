@@ -164,6 +164,23 @@ export interface LeaderboardView {
   rows: LeaderboardRow[];
 }
 
+/* --- GET /api/bounties (+ admin CRUD) ------------------------------------ */
+
+export type BountyTargetType = "player" | "team";
+
+export interface BountyView {
+  id: string;
+  targetType: BountyTargetType;
+  targetId: string;
+  /** Player display name or team name; null if the target no longer exists. */
+  targetName: string | null;
+  description: string;
+  coinValue: number;
+  active: boolean;
+  awardedAt: string | null;
+  createdAt: string;
+}
+
 /* --- helpers ------------------------------------------------------------- */
 
 const COIN_REASON_LABEL: Record<CoinReason, string> = {

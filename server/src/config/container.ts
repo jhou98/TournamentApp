@@ -12,6 +12,7 @@ import { makePrismaGameRepo } from "../adapters/db/prisma/gameRepo.js";
 import { makePrismaLineupRepo } from "../adapters/db/prisma/lineupRepo.js";
 import { makePrismaSuddenDeathRepo } from "../adapters/db/prisma/suddenDeathRepo.js";
 import { makePrismaCoinLedgerRepo } from "../adapters/db/prisma/coinLedgerRepo.js";
+import { makePrismaBountyRepo } from "../adapters/db/prisma/bountyRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -23,6 +24,7 @@ import { makeScheduleService, type ScheduleService } from "../services/scheduleS
 import { makeLineupService, type LineupService } from "../services/lineupService.js";
 import { makeResultsService, type ResultsService } from "../services/resultsService.js";
 import { makeEconomyService, type EconomyService } from "../services/economyService.js";
+import { makeBountyService, type BountyService } from "../services/bountyService.js";
 import { makePlayoffsService, type PlayoffsService } from "../services/playoffsService.js";
 import { makeSuddenDeathService, type SuddenDeathService } from "../services/suddenDeathService.js";
 import type { UnitOfWork } from "../ports/index.js";
@@ -42,6 +44,7 @@ export interface Container {
     playoffs: PlayoffsService;
     suddenDeath: SuddenDeathService;
     economy: EconomyService;
+    bounties: BountyService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -60,6 +63,7 @@ export function buildContainer(env: Env): Container {
   const lineups = makePrismaLineupRepo();
   const suddenDeathRepo = makePrismaSuddenDeathRepo();
   const coinLedger = makePrismaCoinLedgerRepo();
+  const bountyRepo = makePrismaBountyRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -122,6 +126,16 @@ export function buildContainer(env: Env): Container {
     uow: unitOfWork,
   });
 
+  const bounties = makeBountyService({
+    bounties: bountyRepo,
+    coinLedger,
+    tournaments,
+    teams,
+    memberships,
+    users,
+    uow: unitOfWork,
+  });
+
   const results = makeResultsService({
     tournaments,
     matchups,
@@ -170,6 +184,7 @@ export function buildContainer(env: Env): Container {
       playoffs,
       suddenDeath,
       economy,
+      bounties,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };

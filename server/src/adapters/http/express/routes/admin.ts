@@ -8,6 +8,7 @@ import type { ResultsService } from "../../../../services/resultsService.js";
 import type { PlayoffsService } from "../../../../services/playoffsService.js";
 import type { SuddenDeathService } from "../../../../services/suddenDeathService.js";
 import type { EconomyService } from "../../../../services/economyService.js";
+import type { BountyService } from "../../../../services/bountyService.js";
 import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { makeResolveTournament } from "../middleware/tournament.js";
@@ -84,6 +85,12 @@ const adjustCoinsSchema = z.object({
     }),
   note: z.string().trim().max(200).optional(),
 });
+const createBountySchema = z.object({
+  targetType: z.enum(["player", "team"]),
+  targetId: z.string().min(1),
+  description: z.string().trim().min(1).max(200),
+  coinValue: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
+});
 // A game edit may enter/edit a score, reassign a court, or both (US9 + Part 2).
 const editGameSchema = z
   .object({
@@ -105,6 +112,7 @@ export function adminRouter(
   playoffs: PlayoffsService,
   suddenDeath: SuddenDeathService,
   economy: EconomyService,
+  bounties: BountyService,
   tournaments: TournamentService,
   mw: AuthMiddleware,
 ): Router {
@@ -318,6 +326,38 @@ export function adminRouter(
     asyncHandler(async (req, res) => {
       const { userId, delta, note } = parse(adjustCoinsSchema, req.body);
       res.status(201).json(await economy.adjustCoins({ tournamentId: req.tournamentId!, userId, delta, note }));
+    }),
+  );
+
+  // --- Bounties (US16: admin creates, awards, removes) --------------------
+
+  router.get(
+    "/bounties",
+    asyncHandler(async (req, res) => {
+      res.json({ bounties: await bounties.listByTournament(req.tournamentId!) });
+    }),
+  );
+
+  router.post(
+    "/bounties",
+    asyncHandler(async (req, res) => {
+      const input = parse(createBountySchema, req.body);
+      res.status(201).json({ bounty: await bounties.create({ tournamentId: req.tournamentId!, ...input }) });
+    }),
+  );
+
+  router.post(
+    "/bounties/:id/award",
+    asyncHandler(async (req, res) => {
+      res.json(await bounties.award(req.tournamentId!, requireParam(req, "id")));
+    }),
+  );
+
+  router.delete(
+    "/bounties/:id",
+    asyncHandler(async (req, res) => {
+      await bounties.remove(req.tournamentId!, requireParam(req, "id"));
+      res.status(204).end();
     }),
   );
 

@@ -13,6 +13,7 @@ import { scheduleRouter } from "./routes/schedule.js";
 import { matchupsRouter } from "./routes/matchups.js";
 import { resultsRouter } from "./routes/results.js";
 import { leaderboardRouter } from "./routes/leaderboard.js";
+import { bountiesRouter } from "./routes/bounties.js";
 import { tournamentsRouter } from "./routes/tournaments.js";
 
 export function createApp(container: Container): Express {
@@ -46,6 +47,7 @@ export function createApp(container: Container): Express {
       container.services.playoffs,
       container.services.suddenDeath,
       container.services.economy,
+      container.services.bounties,
       container.services.tournaments,
       container.authMiddleware,
     ),
@@ -67,6 +69,10 @@ export function createApp(container: Container): Express {
   api.use(
     "/leaderboard",
     leaderboardRouter(container.services.economy, container.services.tournaments, container.authMiddleware),
+  );
+  api.use(
+    "/bounties",
+    bountiesRouter(container.services.bounties, container.services.tournaments, container.authMiddleware),
   );
   app.use("/api", api);
 
