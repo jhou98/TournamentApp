@@ -89,8 +89,15 @@ Everything after bootstrap is done from GitHub Actions:
   `cfn-lint` on the synthesized templates.
 - **Manual deploy:** Actions → **Deploy to AWS** → pick an `environment`, a `ref` (branch/tag), and
   type `deploy` to confirm. It re-runs the checks, then `cdk deploy TournamentAppInfra -c env=<env>`,
-  uploads the release to S3, and runs `deploy-on-box.sh` on the instance via SSM. The first deploy to
-  an environment also seeds the database (default tournament + bootstrap admin).
+  uploads the release to S3, and runs `deploy-on-box.sh` on the instance via SSM.
+
+**Seeding:** the first deploy of a **non-prod** environment seeds the database (default tournament +
+demo data). **Prod is never auto-seeded** — to keep it clean, seed it manually only if you need to:
+
+```bash
+# on the prod box (via SSM Session Manager), once .env is in place:
+cd /opt/tournamentapp/current/server && npm run db:seed
+```
 
 ## Local commands
 

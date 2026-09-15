@@ -14,14 +14,18 @@
 #   DB_PORT           RDS port (5432)
 #   DB_NAME           database name
 #   DB_SECRET_ARN     Secrets Manager ARN with {username,password}
-#   APP_SECRET_ARN    Secrets Manager ARN with {JWT_SECRET,BOOTSTRAP_ADMIN_CODE}
+#   APP_SECRET_ARN    Secrets Manager ARN with {JWT_SECRET,BOOTSTRAP_ADMIN_CODE,REGISTRATION_CODE}
 #   APP_PORT          port the Node server listens on
+#   APP_ENV           environment name (prod/staging/dev); prod is never auto-seeded
 #
 set -euo pipefail
 
 : "${ARTIFACT_BUCKET:?}" "${ARTIFACT_KEY:?}" "${RELEASE_SHA:?}" "${AWS_REGION:?}"
 : "${DB_ENDPOINT:?}" "${DB_PORT:?}" "${DB_NAME:?}" "${DB_SECRET_ARN:?}"
 : "${APP_SECRET_ARN:?}" "${APP_PORT:?}"
+# Fail safe: an unknown/unset environment is treated as prod, so we never
+# auto-seed unless the environment is explicitly a non-prod one.
+APP_ENV="${APP_ENV:-prod}"
 
 APP_ROOT=/opt/tournamentapp
 RELEASE_DIR="${APP_ROOT}/releases/${RELEASE_SHA}"
@@ -46,6 +50,9 @@ REGISTRATION_CODE="$(jq -r .REGISTRATION_CODE <<<"${APP_JSON}")"
 # Password is generated with ExcludePunctuation, so it is URL-safe as-is.
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_ENDPOINT}:${DB_PORT}/${DB_NAME}?schema=public&sslmode=require"
 
+# Demo players (no-value accounts) are only ever seeded in non-prod.
+if [ "${APP_ENV}" = "prod" ]; then SEED_DEMO_USERS="false"; else SEED_DEMO_USERS="true"; fi
+
 echo "==> Writing server/.env"
 cat >"${RELEASE_DIR}/server/.env" <<ENV
 DATABASE_URL="${DATABASE_URL}"
@@ -53,6 +60,7 @@ DIRECT_URL="${DATABASE_URL}"
 JWT_SECRET="${JWT_SECRET}"
 BOOTSTRAP_ADMIN_CODE="${BOOTSTRAP_ADMIN_CODE}"
 REGISTRATION_CODE="${REGISTRATION_CODE}"
+SEED_DEMO_USERS=${SEED_DEMO_USERS}
 PORT=${APP_PORT}
 ENV
 chmod 600 "${RELEASE_DIR}/server/.env"
@@ -66,9 +74,12 @@ cd "${RELEASE_DIR}/server"
 npx prisma generate
 npx prisma migrate deploy
 
-# Seed once (default tournament + bootstrap admin) on the very first deploy.
-if [ ! -f "${APP_ROOT}/.seeded" ]; then
-  echo "==> First deploy: seeding database"
+# Seed once (default tournament + bootstrap admin) on the first deploy of a
+# NON-prod environment only. Prod is kept clean and seeded manually, if ever.
+if [ "${APP_ENV}" = "prod" ]; then
+  echo "==> Skipping seed (prod is never auto-seeded; seed manually if needed)"
+elif [ ! -f "${APP_ROOT}/.seeded" ]; then
+  echo "==> First deploy (${APP_ENV}): seeding database"
   npm run db:seed
   touch "${APP_ROOT}/.seeded"
 fi
