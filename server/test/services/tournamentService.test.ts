@@ -53,6 +53,9 @@ function fakeTournaments(seed: TournamentSummary[] = []): TournamentRepo & { sto
     async updateConfig() {
       throw new Error("not used");
     },
+    async updateRules() {
+      throw new Error("not used");
+    },
   };
 }
 

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "bounty" ADD COLUMN     "open" BOOLEAN NOT NULL DEFAULT false,
+ALTER COLUMN "targetId" DROP NOT NULL;

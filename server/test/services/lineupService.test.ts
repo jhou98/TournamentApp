@@ -138,6 +138,9 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
     async updateConfig() {
       throw new Error("not used");
     },
+    async updateRules() {
+      throw new Error("not used");
+    },
   };
 
   const matchup: MatchupRecord = {

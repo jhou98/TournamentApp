@@ -87,10 +87,33 @@ const adjustCoinsSchema = z.object({
 });
 const createBountySchema = z.object({
   targetType: z.enum(["player", "team"]),
-  targetId: z.string().min(1),
+  // Omit targetId for an OPEN bounty (first player/team to complete it wins).
+  targetId: z.string().min(1).optional(),
   description: z.string().trim().min(1).max(200),
   coinValue: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
 });
+const awardBountySchema = z.object({ winnerId: z.string().min(1).optional() });
+const resetCoinsSchema = z.object({ note: z.string().trim().max(200).optional() });
+
+// Coin values feed per-game/streak ledger rows (a 32-bit int column) — bound
+// them to the same per-transaction cap so a rule can't overflow the ledger.
+const coinInt = z.number().int().min(-MAX_COIN_ADJUSTMENT).max(MAX_COIN_ADJUSTMENT);
+const coinRuleSchema = z.object({
+  perWin: coinInt,
+  perLoss: coinInt,
+  perCloseLoss: coinInt.optional(),
+  perPointDiff: z.number().min(-MAX_COIN_ADJUSTMENT).max(MAX_COIN_ADJUSTMENT).optional(),
+  flatPerGame: coinInt.optional(),
+  floor: coinInt.optional(),
+  closeLossMargin: z.number().int().positive().optional(),
+});
+const streakRuleSchema = z.object({
+  direction: z.enum(["loss", "win", "both"]),
+  tiers: z.array(z.object({ after: z.number().int().positive(), bonus: coinInt })).max(20),
+});
+const updateRulesSchema = z
+  .object({ coinRule: coinRuleSchema.optional(), streakRule: streakRuleSchema.optional() })
+  .refine((v) => v.coinRule || v.streakRule, { message: "Provide a coin rule and/or a streak rule" });
 // A game edit may enter/edit a score, reassign a court, or both (US9 + Part 2).
 const editGameSchema = z
   .object({
@@ -329,6 +352,31 @@ export function adminRouter(
     }),
   );
 
+  router.post(
+    "/coins/reset",
+    asyncHandler(async (req, res) => {
+      const { note } = parse(resetCoinsSchema, req.body);
+      res.json(await economy.resetCoins(req.tournamentId!, note));
+    }),
+  );
+
+  // --- Economy rules (US: coin + streak rule config editing) --------------
+
+  router.get(
+    "/tournament/rules",
+    asyncHandler(async (req, res) => {
+      res.json({ rules: await economy.getRules(req.tournamentId!) });
+    }),
+  );
+
+  router.patch(
+    "/tournament/rules",
+    asyncHandler(async (req, res) => {
+      const patch = parse(updateRulesSchema, req.body);
+      res.json({ rules: await economy.updateRules(req.tournamentId!, patch) });
+    }),
+  );
+
   // --- Bounties (US16: admin creates, awards, removes) --------------------
 
   router.get(
@@ -349,7 +397,8 @@ export function adminRouter(
   router.post(
     "/bounties/:id/award",
     asyncHandler(async (req, res) => {
-      res.json(await bounties.award(req.tournamentId!, requireParam(req, "id")));
+      const { winnerId } = parse(awardBountySchema, req.body ?? {});
+      res.json(await bounties.award(req.tournamentId!, requireParam(req, "id"), winnerId));
     }),
   );
 

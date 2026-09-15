@@ -171,14 +171,43 @@ export type BountyTargetType = "player" | "team";
 export interface BountyView {
   id: string;
   targetType: BountyTargetType;
-  targetId: string;
-  /** Player display name or team name; null if the target no longer exists. */
+  /** True for an open bounty (first player/team to complete it wins). */
+  open: boolean;
+  targetId: string | null;
+  /** Player/team name; the winner for an awarded open bounty; null if open & unresolved. */
   targetName: string | null;
   description: string;
   coinValue: number;
   active: boolean;
   awardedAt: string | null;
   createdAt: string;
+}
+
+/* --- GET/PATCH /api/admin/tournament/rules ------------------------------- */
+
+export interface CoinRule {
+  perWin: number;
+  perLoss: number;
+  perCloseLoss?: number;
+  perPointDiff?: number;
+  flatPerGame?: number;
+  floor?: number;
+  closeLossMargin?: number;
+}
+
+export interface StreakTier {
+  after: number;
+  bonus: number;
+}
+
+export interface StreakRule {
+  direction: "loss" | "win" | "both";
+  tiers: StreakTier[];
+}
+
+export interface EconomyRules {
+  coinRule: CoinRule;
+  streakRule: StreakRule;
 }
 
 /* --- helpers ------------------------------------------------------------- */

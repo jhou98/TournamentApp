@@ -262,6 +262,24 @@ export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputEleme
   return <input className={cx("ctl", className)} {...rest} />;
 }
 
+/** A small info icon with a hover/focus tooltip explaining a nearby field. */
+export function InfoHint({ text, className }: { text: string; className?: string }) {
+  return (
+    <span
+      tabIndex={0}
+      role="img"
+      aria-label={text}
+      title={text}
+      className={cx(
+        "inline-flex cursor-help items-center align-middle text-ink-faint hover:text-ink-muted focus:text-ink-muted focus:outline-none",
+        className,
+      )}
+    >
+      <Icon name="info" size={14} />
+    </span>
+  );
+}
+
 export function Select({ className, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={cx("ctl", className)} {...rest} />;
 }
@@ -273,7 +291,7 @@ export function Alert({
   children,
   onClose,
 }: {
-  tone: "error" | "success" | "info";
+  tone: "error" | "success" | "info" | "warning";
   children: ReactNode;
   onClose?: () => void;
 }) {
@@ -281,6 +299,7 @@ export function Alert({
     error: "border-danger/30 bg-danger-soft text-danger-ink",
     success: "border-success/30 bg-success-soft text-success-ink",
     info: "border-info/30 bg-info-soft text-info-ink",
+    warning: "border-amber/40 bg-amber-soft text-amber-ink",
   }[tone];
   return (
     <div role={tone === "error" ? "alert" : "status"} className={cx("mb-4 flex items-start gap-2 rounded-ctl border px-3 py-2 text-sm", cls)}>

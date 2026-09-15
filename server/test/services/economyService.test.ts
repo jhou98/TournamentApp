@@ -170,6 +170,11 @@ function buildService(stores: Stores): EconomyService {
     async updateConfig() {
       throw new Error("not used");
     },
+    async updateRules(_id, patch) {
+      if (patch.coinRule) stores.tournament!.coinRule = patch.coinRule;
+      if (patch.streakRule) stores.tournament!.streakRule = patch.streakRule;
+      return { ...stores.tournament! };
+    },
   };
 
   const games: GameRepo = {
@@ -716,5 +721,73 @@ describe("economyService.adjustCoins", () => {
   it("does not use the derived-row delete path (adjustments survive recompute)", async () => {
     await service.adjustCoins({ tournamentId: TID, userId: "a1", delta: 10 });
     expect(stores.deletedFor).toHaveLength(0);
+  });
+});
+
+describe("economyService.resetCoins", () => {
+  let stores: Stores;
+  let service: EconomyService;
+
+  beforeEach(() => {
+    stores = freshStores();
+    service = buildService(stores);
+  });
+
+  it("writes a reversing admin_adjust row for every non-zero balance", async () => {
+    stores.balances = [
+      { userId: "a1", balance: 120 },
+      { userId: "a2", balance: 0 }, // already zero -> skipped
+      { userId: "b1", balance: -30 },
+    ];
+
+    const result = await service.resetCoins(TID, "  Fresh event  ");
+
+    expect(result).toEqual({ playersReset: 2, coinsReversed: 90 });
+    const rows = stores.createdRows[0]!;
+    const byUser = new Map(rows.map((r) => [r.userId, r]));
+    expect(byUser.get("a1")).toMatchObject({ delta: -120, reason: "admin_adjust", note: "Fresh event" });
+    expect(byUser.get("b1")).toMatchObject({ delta: 30, reason: "admin_adjust", note: "Fresh event" });
+    expect(byUser.has("a2")).toBe(false);
+    // Reset never deletes — it only appends reversing rows.
+    expect(stores.deletedFor).toHaveLength(0);
+  });
+
+  it("does nothing when every balance is already zero", async () => {
+    stores.balances = [{ userId: "a1", balance: 0 }];
+    const result = await service.resetCoins(TID);
+    expect(result).toEqual({ playersReset: 0, coinsReversed: 0 });
+    expect(stores.createdRows).toHaveLength(0);
+  });
+});
+
+describe("economyService.getRules / updateRules", () => {
+  let stores: Stores;
+  let service: EconomyService;
+
+  beforeEach(() => {
+    stores = freshStores();
+    service = buildService(stores);
+  });
+
+  it("returns the tournament's current rules", async () => {
+    const rules = await service.getRules(TID);
+    expect(rules.coinRule).toEqual(DEFAULT_COIN_RULE);
+    expect(rules.streakRule).toEqual(DEFAULT_STREAK_RULE);
+  });
+
+  it("persists new rules and recomputes derived coins with them", async () => {
+    const coinRule = { perWin: 10, perLoss: 1 };
+    const result = await service.updateRules(TID, { coinRule });
+
+    expect(result.coinRule).toEqual(coinRule);
+    expect(stores.tournament!.coinRule).toEqual(coinRule);
+    // Recompute ran and used the new perWin (g1: a1/a2 win).
+    expect(stores.deletedFor).toContain(TID);
+    const rows = stores.createdRows.at(-1)!;
+    expect(rows.find((r) => r.gameId === "g1" && r.userId === "a1")!.delta).toBe(10);
+  });
+
+  it("rejects an empty patch", async () => {
+    await expect(service.updateRules(TID, {})).rejects.toThrow();
   });
 });

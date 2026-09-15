@@ -54,6 +54,7 @@ function buildService(stores: Stores): BountyService {
         id: `b${++stores.seq}`,
         tournamentId: b.tournamentId,
         targetType: b.targetType,
+        open: b.open,
         targetId: b.targetId,
         description: b.description,
         coinValue: b.coinValue,
@@ -74,10 +75,11 @@ function buildService(stores: Stores): BountyService {
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
         .map((b) => ({ ...b }));
     },
-    async markAwarded(id) {
+    async markAwarded(id, winnerId) {
       const b = stores.bounties.find((x) => x.id === id)!;
       b.active = false;
       b.awardedAt = new Date("2026-03-01T00:00:00.000Z");
+      if (winnerId) b.targetId = winnerId;
       return { ...b };
     },
     async delete(id) {
@@ -119,6 +121,9 @@ function buildService(stores: Stores): BountyService {
     },
     async setStatus() {},
     async updateConfig() {
+      throw new Error("not used");
+    },
+    async updateRules() {
       throw new Error("not used");
     },
   } satisfies TournamentRepo;
@@ -312,5 +317,56 @@ describe("bountyService.listActive / remove", () => {
     const bounty = await service.create({ tournamentId: TID, targetType: "player", targetId: "a1", description: "x", coinValue: 10 });
     await service.remove(TID, bounty.id);
     expect(stores.bounties).toHaveLength(0);
+  });
+});
+
+describe("bountyService open bounties", () => {
+  let stores: Stores;
+  let service: BountyService;
+
+  beforeEach(() => {
+    stores = freshStores();
+    service = buildService(stores);
+  });
+
+  it("creates an open bounty with no preset target", async () => {
+    const bounty = await service.create({ tournamentId: TID, targetType: "player", description: "First to ace", coinValue: 40 });
+    expect(bounty).toMatchObject({ open: true, targetId: null, targetName: null, targetType: "player" });
+  });
+
+  it("directed bounties are not open", async () => {
+    const bounty = await service.create({ tournamentId: TID, targetType: "player", targetId: "a1", description: "x", coinValue: 10 });
+    expect(bounty.open).toBe(false);
+  });
+
+  it("awards an open player bounty to the chosen winner and records them", async () => {
+    const bounty = await service.create({ tournamentId: TID, targetType: "player", description: "First to ace", coinValue: 40 });
+    const result = await service.award(TID, bounty.id, "a2");
+
+    expect(result.recipients).toBe(1);
+    expect(result.bounty.targetName).toBe("Abe");
+    expect(stores.createdRows).toEqual([
+      { tournamentId: TID, userId: "a2", delta: 40, reason: "bounty", bountyId: bounty.id, note: "First to ace" },
+    ]);
+    expect(stores.bounties[0]!.targetId).toBe("a2");
+  });
+
+  it("awards an open team bounty to every member of the winning team", async () => {
+    const bounty = await service.create({ tournamentId: TID, targetType: "team", description: "First team to sweep", coinValue: 20 });
+    const result = await service.award(TID, bounty.id, TA);
+    expect(result.recipients).toBe(2);
+    expect(stores.createdRows.map((r) => r.userId).sort()).toEqual(["a1", "a2"]);
+  });
+
+  it("refuses to award an open bounty without a winner", async () => {
+    const bounty = await service.create({ tournamentId: TID, targetType: "player", description: "x", coinValue: 10 });
+    await expect(service.award(TID, bounty.id)).rejects.toThrow(/choose/i);
+    expect(stores.createdRows).toHaveLength(0);
+  });
+
+  it("rejects a winner who isn't in the tournament", async () => {
+    const bounty = await service.create({ tournamentId: TID, targetType: "player", description: "x", coinValue: 10 });
+    await expect(service.award(TID, bounty.id, "stranger")).rejects.toThrow();
+    expect(stores.createdRows).toHaveLength(0);
   });
 });

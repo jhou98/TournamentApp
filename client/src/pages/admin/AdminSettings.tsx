@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { orderRounds, type ScheduleView } from "../../lib/types";
-import { Alert, Button, Card, EmptyState, Field, Input, Select, StatusPill } from "../../components/ui";
+import { orderRounds, type CoinRule, type EconomyRules, type ScheduleView, type StreakRule } from "../../lib/types";
+import { useToast } from "../../components/Toast";
+import { Alert, Button, Card, EmptyState, Field, InfoHint, Input, Select, StatusPill } from "../../components/ui";
 
 interface TournamentConfig {
   id: string;
@@ -122,6 +123,9 @@ export function AdminSettings() {
           <p className="mt-4 text-xs text-ink-muted">Config is locked while the schedule is active.</p>
         )}
       </Card>
+
+      {/* --- Coin & streak rules ------------------------------------------ */}
+      <RulesCard />
 
       {/* --- Generate / reset / seed playoffs ----------------------------- */}
       <Card title="Schedule" className="mb-5">
@@ -278,5 +282,221 @@ function TeamSelect({
         </option>
       ))}
     </Select>
+  );
+}
+
+/* --- Coin & streak rule editor (economy config) ------------------------- */
+
+type CoinField = keyof CoinRule;
+const COIN_FIELDS: { key: CoinField; label: string; help: string; required?: boolean }[] = [
+  { key: "perWin", label: "Coins per win", required: true, help: "Coins each player on the winning pair earns for a game." },
+  { key: "perLoss", label: "Coins per loss", required: true, help: "Coins each player on the losing pair earns for a game." },
+  {
+    key: "perCloseLoss",
+    label: "Coins per close loss",
+    help: "Coins for a loss within the close-loss margin — replaces 'Coins per loss' for tight games.",
+  },
+  {
+    key: "closeLossMargin",
+    label: "Close-loss margin",
+    help: "A loss by this many points or fewer counts as 'close' and pays 'Coins per close loss'.",
+  },
+  {
+    key: "perPointDiff",
+    label: "Per point differential",
+    help: "Extra coins per point of score margin — added for winners, subtracted for losers.",
+  },
+  { key: "flatPerGame", label: "Flat coins per game", help: "Coins every player earns just for playing a game, win or lose." },
+  { key: "floor", label: "Floor (min per game)", help: "The fewest coins a player can come away with from one game." },
+];
+
+interface TierDraft {
+  after: string;
+  bonus: string;
+}
+
+/** Parse a numeric input; returns undefined for a blank/invalid entry. */
+function num(s: string): number | undefined {
+  const t = s.trim();
+  if (t === "") return undefined;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function RulesCard() {
+  const { showToast } = useToast();
+  const [coin, setCoin] = useState<Record<CoinField, string> | null>(null);
+  const [direction, setDirection] = useState<StreakRule["direction"]>("loss");
+  const [tiers, setTiers] = useState<TierDraft[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    setError(null);
+    try {
+      const { rules } = await api<{ rules: EconomyRules }>("/admin/tournament/rules");
+      setCoin(
+        Object.fromEntries(
+          COIN_FIELDS.map((f) => [f.key, rules.coinRule[f.key] === undefined ? "" : String(rules.coinRule[f.key])]),
+        ) as Record<CoinField, string>,
+      );
+      setDirection(rules.streakRule.direction);
+      setTiers(rules.streakRule.tiers.map((t) => ({ after: String(t.after), bonus: String(t.bonus) })));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load rules");
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function save() {
+    if (!coin || busy) return;
+
+    // Required fields must be whole numbers.
+    const perWin = num(coin.perWin);
+    const perLoss = num(coin.perLoss);
+    if (!Number.isInteger(perWin) || !Number.isInteger(perLoss)) {
+      showToast("Coins per win and per loss are required whole numbers.", "error");
+      return;
+    }
+
+    const coinRule: CoinRule = { perWin: perWin!, perLoss: perLoss! };
+    for (const f of COIN_FIELDS) {
+      if (f.required) continue;
+      const v = num(coin[f.key]);
+      if (v !== undefined) coinRule[f.key] = v;
+    }
+
+    // Only keep fully-filled tiers; sort by threshold for tidiness.
+    const parsedTiers = tiers
+      .map((t) => ({ after: num(t.after), bonus: num(t.bonus) }))
+      .filter((t): t is { after: number; bonus: number } => t.after !== undefined && t.bonus !== undefined)
+      .sort((a, b) => a.after - b.after);
+    if (parsedTiers.some((t) => !Number.isInteger(t.after) || t.after <= 0 || !Number.isInteger(t.bonus))) {
+      showToast("Each streak tier needs a positive whole-number threshold and a whole-number bonus.", "error");
+      return;
+    }
+
+    const streakRule: StreakRule = { direction, tiers: parsedTiers };
+
+    if (
+      !window.confirm(
+        "Saving new rules recomputes coins for EVERY result already entered in this tournament. " +
+          "Match and streak coins will change to match the new rules (manual adjustments and bounties are kept). Continue?",
+      )
+    )
+      return;
+
+    setBusy(true);
+    try {
+      await api("/admin/tournament/rules", { method: "PATCH", body: JSON.stringify({ coinRule, streakRule }) });
+      showToast("Rules saved — coins recomputed for existing results.", "success");
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not save rules", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (error) return <Alert tone="error">{error}</Alert>;
+  if (!coin) return null;
+
+  return (
+    <Card
+      title="Coin & streak rules"
+      subtitle="How coins are earned in this tournament."
+      className="mb-5"
+    >
+      <Alert tone="warning">
+        Saving these rules <strong>recomputes coins for every result already entered</strong> — match and streak coins
+        change to match the new rules. Manual adjustments and bounties are kept.
+      </Alert>
+
+      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-muted">Coins per game</h3>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {COIN_FIELDS.map((f) => (
+          <Field
+            key={f.key}
+            label={
+              <span className="inline-flex items-center gap-1">
+                {f.label}
+                <InfoHint text={f.help} />
+              </span>
+            }
+          >
+            <Input
+              type="number"
+              inputMode="numeric"
+              placeholder={f.required ? "required" : "optional"}
+              value={coin[f.key]}
+              onChange={(e) => setCoin({ ...coin, [f.key]: e.target.value })}
+            />
+          </Field>
+        ))}
+      </div>
+
+      <h3 className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-ink-muted">Streak bonus</h3>
+      <div className="grid gap-3 sm:max-w-xs">
+        <Field
+          label={
+            <span className="inline-flex items-center gap-1">
+              Direction
+              <InfoHint text="Which kind of run earns a bonus: consecutive losses, consecutive wins, or both. A run resets on the opposite result." />
+            </span>
+          }
+        >
+          <Select value={direction} onChange={(e) => setDirection(e.target.value as StreakRule["direction"])}>
+            <option value="loss">Losing streaks</option>
+            <option value="win">Winning streaks</option>
+            <option value="both">Both</option>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <span className="flex items-center gap-1 text-xs font-bold text-ink-muted">
+          Tiers
+          <InfoHint text="When a player's run of matchups reaches a tier's threshold, they earn that tier's bonus. Higher tiers pay out as the run grows." />
+        </span>
+        {tiers.length === 0 && <p className="text-xs text-ink-faint">No tiers — no streak bonuses.</p>}
+        {tiers.map((t, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-xs text-ink-muted">After</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              className="w-20"
+              value={t.after}
+              onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, after: e.target.value } : x)))}
+            />
+            <span className="text-xs text-ink-muted">in a row →</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              className="w-24"
+              placeholder="bonus"
+              value={t.bonus}
+              onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, bonus: e.target.value } : x)))}
+            />
+            <span className="text-xs text-ink-muted">coins</span>
+            <Button variant="ghost" size="sm" onClick={() => setTiers(tiers.filter((_, j) => j !== i))}>
+              Remove
+            </Button>
+          </div>
+        ))}
+        <Button variant="secondary" size="sm" icon="plus" onClick={() => setTiers([...tiers, { after: "", bonus: "" }])}>
+          Add tier
+        </Button>
+      </div>
+
+      <div className="mt-5">
+        <Button icon="check" disabled={busy} onClick={save}>
+          Save rules
+        </Button>
+      </div>
+    </Card>
   );
 }

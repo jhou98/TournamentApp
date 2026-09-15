@@ -9,8 +9,9 @@
  */
 
 import { NotFoundError, ValidationError } from "../domain/errors.js";
-import { MAX_COIN_ADJUSTMENT } from "../domain/coinRule.js";
+import { MAX_COIN_ADJUSTMENT, type CoinRule } from "../domain/coinRule.js";
 import { computeCoinLeaderboard, type LeaderboardRow } from "../domain/coinLeaderboard.js";
+import type { StreakRule } from "../domain/streak.js";
 import { computeLedger, type DerivedCoinTxn, type LedgerGameInput } from "../domain/ledger.js";
 import { computeStreakBonuses, type MatchupOutcome, type PlayerOutcomes } from "../domain/streak.js";
 import type {
@@ -113,6 +114,20 @@ export interface CoinAdjustResult {
   transaction: CoinTransactionView;
 }
 
+/** Outcome of a tournament-wide coin reset (US28). */
+export interface CoinResetResult {
+  /** How many players had a non-zero balance zeroed. */
+  playersReset: number;
+  /** Total coins reversed (the sum of the balances that were zeroed). */
+  coinsReversed: number;
+}
+
+/** The two admin-tunable economy rules of a tournament (D4/D16). */
+export interface CoinStreakRules {
+  coinRule: CoinRule;
+  streakRule: StreakRule;
+}
+
 export interface EconomyService {
   /** Recompute (delete + re-insert) the tournament's derived coin rows from its finalized games. */
   recomputeTournamentLedger(tournamentId: string): Promise<void>;
@@ -131,10 +146,26 @@ export interface EconomyService {
     delta: number;
     note?: string | null;
   }): Promise<CoinAdjustResult>;
+  /**
+   * Zero every balance in a tournament (US28) by writing a reversing
+   * `admin_adjust` row per player — auditable, not a delete. New activity after
+   * a reset accrues from zero.
+   */
+  resetCoins(tournamentId: string, note?: string | null): Promise<CoinResetResult>;
+  /** The tournament's current coin + streak rules (D4/D16). */
+  getRules(tournamentId: string): Promise<CoinStreakRules>;
+  /**
+   * Update the coin and/or streak rules, then recompute the derived ledger so
+   * existing coins reflect the new rules immediately (idempotent).
+   */
+  updateRules(
+    tournamentId: string,
+    patch: { coinRule?: CoinRule; streakRule?: StreakRule },
+  ): Promise<CoinStreakRules>;
 }
 
 export function makeEconomyService(deps: EconomyServiceDeps): EconomyService {
-  return {
+  const service: EconomyService = {
     async recomputeTournamentLedger(tournamentId) {
       const t = await deps.tournaments.getDetail(tournamentId);
       if (!t) return;
@@ -365,5 +396,53 @@ export function makeEconomyService(deps: EconomyServiceDeps): EconomyService {
         },
       };
     },
+
+    async resetCoins(tournamentId, note) {
+      const balances = await deps.coinLedger.sumByTournamentGroupedByUser(tournamentId);
+      const nonZero = balances.filter((b) => b.balance !== 0);
+      const label = note?.trim() ? note.trim() : "Coin reset";
+
+      const rows = nonZero.map((b) => ({
+        tournamentId,
+        userId: b.userId,
+        delta: -b.balance, // reverse to zero — auditable, not a delete
+        reason: "admin_adjust" as const,
+        note: label,
+      }));
+
+      if (rows.length > 0) {
+        await deps.uow.run(async () => {
+          await deps.coinLedger.createMany(rows);
+        });
+      }
+
+      return {
+        playersReset: rows.length,
+        coinsReversed: nonZero.reduce((sum, b) => sum + b.balance, 0),
+      };
+    },
+
+    async getRules(tournamentId) {
+      const t = await deps.tournaments.getDetail(tournamentId);
+      if (!t) throw new NotFoundError("Tournament not found");
+      return { coinRule: t.coinRule, streakRule: t.streakRule };
+    },
+
+    async updateRules(tournamentId, patch) {
+      if (patch.coinRule === undefined && patch.streakRule === undefined) {
+        throw new ValidationError("Provide a coin rule and/or a streak rule to update");
+      }
+      const t = await deps.tournaments.getDetail(tournamentId);
+      if (!t) throw new NotFoundError("Tournament not found");
+
+      const updated = await deps.tournaments.updateRules(tournamentId, patch);
+      // Re-derive match + streak coins so the new rules take effect on results
+      // already entered (admin adjustments and bounties are untouched).
+      await service.recomputeTournamentLedger(tournamentId);
+
+      return { coinRule: updated.coinRule, streakRule: updated.streakRule };
+    },
   };
+
+  return service;
 }

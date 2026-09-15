@@ -15,13 +15,16 @@ interface TeamRoster {
   name: string;
   members: RosterMember[];
 }
+interface PlayerOption extends RosterMember {
+  teamName: string;
+}
 
 const MAX_COIN_ADJUSTMENT = 1_000_000; // mirrors the server cap (domain/coinRule.ts)
 
 /**
- * Admin bounty management (US16): put a coin reward on a player or team, then
- * award it when earned. Awarding credits the target (one player, or every
- * current team member) with `bounty` coins and closes the bounty out.
+ * Admin bounty management (US16): put a coin reward on a player or team, or
+ * leave it OPEN for the first player/team to complete it. Awarding credits the
+ * winner (one player, or every current team member) and closes the bounty out.
  */
 export function AdminBounties() {
   const { activeTournamentId } = useAuth();
@@ -31,12 +34,13 @@ export function AdminBounties() {
   const [error, setError] = useState<string | null>(null);
 
   const [targetType, setTargetType] = useState<BountyTargetType>("player");
+  const [open, setOpen] = useState(false);
   const [targetId, setTargetId] = useState("");
   const [description, setDescription] = useState("");
   const [coinValue, setCoinValue] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const players = useMemo(
+  const players: PlayerOption[] = useMemo(
     () => teams.flatMap((t) => t.members.map((m) => ({ ...m, teamName: t.name }))),
     [teams],
   );
@@ -62,7 +66,7 @@ export function AdminBounties() {
 
   const coins = Number(coinValue);
   const canCreate =
-    targetId !== "" &&
+    (open || targetId !== "") &&
     description.trim() !== "" &&
     coinValue.trim() !== "" &&
     Number.isInteger(coins) &&
@@ -75,9 +79,14 @@ export function AdminBounties() {
     try {
       await api("/admin/bounties", {
         method: "POST",
-        body: JSON.stringify({ targetType, targetId, description: description.trim(), coinValue: coins }),
+        body: JSON.stringify({
+          targetType,
+          description: description.trim(),
+          coinValue: coins,
+          ...(open ? {} : { targetId }),
+        }),
       });
-      showToast("Bounty created.", "success");
+      showToast(open ? "Open bounty created." : "Bounty created.", "success");
       setDescription("");
       setCoinValue("");
       setTargetId("");
@@ -89,9 +98,12 @@ export function AdminBounties() {
     }
   }
 
-  async function award(b: BountyView) {
+  async function award(b: BountyView, winnerId?: string) {
     try {
-      const res = await api<{ recipients: number }>(`/admin/bounties/${b.id}/award`, { method: "POST" });
+      const res = await api<{ recipients: number }>(`/admin/bounties/${b.id}/award`, {
+        method: "POST",
+        body: JSON.stringify(winnerId ? { winnerId } : {}),
+      });
       showToast(
         `Awarded ${b.coinValue} coins to ${res.recipients} ${res.recipients === 1 ? "player" : "players"}.`,
         "success",
@@ -117,9 +129,9 @@ export function AdminBounties() {
     <>
       {error && <Alert tone="error">{error}</Alert>}
 
-      <Card className="mb-5" title="New bounty" subtitle="Reward a player or team when they pull something off.">
+      <Card className="mb-5" title="New bounty" subtitle="Reward a specific target, or leave it open for the first to complete it.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Target">
+          <Field label="Scope">
             <Select
               value={targetType}
               onChange={(e) => {
@@ -133,8 +145,8 @@ export function AdminBounties() {
           </Field>
 
           <Field label={targetType === "player" ? "Player" : "Team"}>
-            <Select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-              <option value="">Select…</option>
+            <Select value={targetId} disabled={open} onChange={(e) => setTargetId(e.target.value)}>
+              <option value="">{open ? "Open — decided on award" : "Select…"}</option>
               {targetType === "player"
                 ? players.map((p) => (
                     <option key={p.userId} value={p.userId}>
@@ -149,7 +161,7 @@ export function AdminBounties() {
             </Select>
           </Field>
 
-          <Field label="Coins" className="lg:col-span-1">
+          <Field label="Coins">
             <Input
               type="number"
               inputMode="numeric"
@@ -160,7 +172,7 @@ export function AdminBounties() {
             />
           </Field>
 
-          <Field label="Description" className="sm:col-span-2 lg:col-span-1">
+          <Field label="Description">
             <Input
               placeholder="What earns it?"
               value={description}
@@ -170,6 +182,17 @@ export function AdminBounties() {
             />
           </Field>
         </div>
+
+        <label className="mt-3 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={open} onChange={(e) => setOpen(e.target.checked)} />
+          <span>
+            <span className="font-semibold">Open bounty</span>{" "}
+            <span className="text-ink-muted">
+              — first {targetType === "player" ? "player" : "team"} to complete it wins; you pick the winner when awarding.
+            </span>
+          </span>
+        </label>
+
         <div className="mt-3">
           <Button icon="plus" disabled={!canCreate || busy} onClick={create}>
             Create bounty
@@ -194,48 +217,14 @@ export function AdminBounties() {
               </thead>
               <tbody>
                 {bounties.map((b) => (
-                  <tr key={b.id}>
-                    <td className="font-semibold">{b.description}</td>
-                    <td>
-                      {b.targetType === "team" && b.targetName ? (
-                        <TeamChip name={b.targetName} size={20} />
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5">
-                          <Icon name="user" size={14} />
-                          {b.targetName ?? <span className="text-ink-faint">(removed)</span>}
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      <span className="inline-flex items-center gap-1.5 font-bold tabular-nums text-brand">
-                        <Icon name="coins" size={14} />
-                        {b.coinValue}
-                      </span>
-                    </td>
-                    <td>
-                      {b.active ? (
-                        <Pill tone="brand" icon="flag">
-                          Active
-                        </Pill>
-                      ) : (
-                        <Pill tone="success" icon="check">
-                          Awarded
-                        </Pill>
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex justify-end gap-2">
-                        {b.active && (
-                          <Button size="sm" icon="coins" onClick={() => award(b)}>
-                            Award
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => remove(b)}>
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                  <BountyRow
+                    key={b.id}
+                    bounty={b}
+                    players={players}
+                    teams={teams}
+                    onAward={award}
+                    onDelete={remove}
+                  />
                 ))}
               </tbody>
             </table>
@@ -243,5 +232,103 @@ export function AdminBounties() {
         </Card>
       )}
     </>
+  );
+}
+
+function BountyRow({
+  bounty: b,
+  players,
+  teams,
+  onAward,
+  onDelete,
+}: {
+  bounty: BountyView;
+  players: PlayerOption[];
+  teams: TeamRoster[];
+  onAward: (b: BountyView, winnerId?: string) => void;
+  onDelete: (b: BountyView) => void;
+}) {
+  const [winner, setWinner] = useState("");
+  const scopeLabel = b.targetType === "player" ? "any player" : "any team";
+
+  return (
+    <tr>
+      <td className="font-semibold">{b.description}</td>
+      <td>
+        {b.open && !b.targetName ? (
+          <span className="inline-flex items-center gap-1.5 text-ink-muted">
+            <Icon name="target" size={14} />
+            Open · {scopeLabel}
+          </span>
+        ) : b.targetType === "team" && b.targetName ? (
+          <span className="inline-flex items-center gap-1.5">
+            <TeamChip name={b.targetName} size={20} />
+            {b.open && <Pill tone="neutral">was open</Pill>}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="user" size={14} />
+            {b.targetName ?? <span className="text-ink-faint">(removed)</span>}
+            {b.open && <Pill tone="neutral">was open</Pill>}
+          </span>
+        )}
+      </td>
+      <td className="text-right">
+        <span className="inline-flex items-center gap-1.5 font-bold tabular-nums text-brand">
+          <Icon name="coins" size={14} />
+          {b.coinValue}
+        </span>
+      </td>
+      <td>
+        {b.active ? (
+          <Pill tone="brand" icon="flag">
+            Active
+          </Pill>
+        ) : (
+          <Pill tone="success" icon="check">
+            Awarded
+          </Pill>
+        )}
+      </td>
+      <td>
+        <div className="flex items-center justify-end gap-2">
+          {b.active && b.open ? (
+            <>
+              <Select
+                className="ctl ctl-sm w-40"
+                value={winner}
+                onChange={(e) => setWinner(e.target.value)}
+                aria-label="Winner"
+              >
+                <option value="">Winner…</option>
+                {b.targetType === "player"
+                  ? players.map((p) => (
+                      <option key={p.userId} value={p.userId}>
+                        {p.displayName} · {p.teamName}
+                      </option>
+                    ))
+                  : teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+              </Select>
+              <Button size="sm" icon="coins" disabled={!winner} onClick={() => onAward(b, winner)}>
+                Award
+              </Button>
+            </>
+          ) : (
+            b.active && (
+              <Button size="sm" icon="coins" onClick={() => onAward(b)}>
+                Award
+              </Button>
+            )
+          )}
+          <Button variant="ghost" size="sm" onClick={() => onDelete(b)}>
+            Delete
+          </Button>
+        </div>
+      </td>
+    </tr>
   );
 }

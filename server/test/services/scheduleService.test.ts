@@ -86,6 +86,9 @@ function buildService(stores: Stores): ScheduleService {
       Object.assign(stores.tournament, patch);
       return { ...stores.tournament };
     },
+    async updateRules() {
+      throw new Error("not used");
+    },
   };
 
   const teams: TeamRepo = {

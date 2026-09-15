@@ -5,6 +5,7 @@ const RECORD_SELECT = {
   id: true,
   tournamentId: true,
   targetType: true,
+  open: true,
   targetId: true,
   description: true,
   coinValue: true,
@@ -28,10 +29,10 @@ export function makePrismaBountyRepo(): BountyRepo {
         select: RECORD_SELECT,
       });
     },
-    async markAwarded(id) {
+    async markAwarded(id, winnerId) {
       return getDb().bounty.update({
         where: { id },
-        data: { active: false, awardedAt: new Date() },
+        data: { active: false, awardedAt: new Date(), ...(winnerId ? { targetId: winnerId } : {}) },
         select: RECORD_SELECT,
       });
     },

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { BountyView } from "../lib/types";
 import { Icon } from "../components/Icon";
-import { Alert, Card, EmptyState, Loading, PageHeader, TeamChip } from "../components/ui";
+import { Alert, Card, EmptyState, Loading, PageHeader, Pill, TeamChip } from "../components/ui";
 
 /** Active bounties for the tournament, visible to every signed-in player (US16). */
 export function Bounties() {
@@ -32,17 +32,26 @@ export function Bounties() {
             <Card key={b.id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold">{b.description}</div>
+                  <div className="flex items-center gap-2 font-semibold">
+                    {b.description}
+                    {b.open && <Pill tone="brand">Open</Pill>}
+                  </div>
                   <div className="mt-1 text-sm text-ink-muted">
-                    {b.targetType === "team" ? "Team: " : "Player: "}
-                    {b.targetName ? (
-                      b.targetType === "team" ? (
-                        <TeamChip name={b.targetName} size={18} />
-                      ) : (
-                        <span className="font-medium text-ink">{b.targetName}</span>
-                      )
+                    {b.open ? (
+                      <>First {b.targetType === "team" ? "team" : "player"} to complete it wins</>
                     ) : (
-                      <span className="text-ink-faint">—</span>
+                      <>
+                        {b.targetType === "team" ? "Team: " : "Player: "}
+                        {b.targetName ? (
+                          b.targetType === "team" ? (
+                            <TeamChip name={b.targetName} size={18} />
+                          ) : (
+                            <span className="font-medium text-ink">{b.targetName}</span>
+                          )
+                        ) : (
+                          <span className="text-ink-faint">—</span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

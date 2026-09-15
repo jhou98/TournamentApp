@@ -86,5 +86,12 @@ export function makePrismaTournamentRepo(): TournamentRepo {
       });
       return toDetail(row);
     },
+    async updateRules(id, patch) {
+      const data: Prisma.TournamentUpdateInput = {};
+      if (patch.coinRule !== undefined) data.coinRule = patch.coinRule as unknown as Prisma.InputJsonValue;
+      if (patch.streakRule !== undefined) data.streakRule = patch.streakRule as unknown as Prisma.InputJsonValue;
+      const row = await getDb().tournament.update({ where: { id }, data, select: DETAIL_SELECT });
+      return toDetail(row);
+    },
   };
 }

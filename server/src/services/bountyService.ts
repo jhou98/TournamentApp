@@ -38,8 +38,10 @@ export interface BountyServiceDeps {
 export interface BountyView {
   id: string;
   targetType: BountyTargetType;
-  targetId: string;
-  /** Player display name or team name; null if the target no longer exists. */
+  /** True for an open bounty (first player/team to complete it wins). */
+  open: boolean;
+  targetId: string | null;
+  /** Player/team name; the winner for an awarded open bounty; null if open & unresolved. */
   targetName: string | null;
   description: string;
   coinValue: number;
@@ -51,7 +53,8 @@ export interface BountyView {
 export interface CreateBountyInput {
   tournamentId: string;
   targetType: BountyTargetType;
-  targetId: string;
+  /** Omit (or null) to create an OPEN bounty scoped by targetType. */
+  targetId?: string | null;
   description: string;
   coinValue: number;
 }
@@ -68,7 +71,12 @@ export interface BountyService {
   listByTournament(tournamentId: string): Promise<BountyView[]>;
   /** Only the still-active bounties (what players see). */
   listActive(tournamentId: string): Promise<BountyView[]>;
-  award(tournamentId: string, bountyId: string): Promise<AwardBountyResult>;
+  /**
+   * Award a bounty. For an open bounty, `winnerId` is required and names the
+   * winning player/team (per the bounty's targetType); for a directed bounty it
+   * is ignored (the preset target is credited).
+   */
+  award(tournamentId: string, bountyId: string, winnerId?: string): Promise<AwardBountyResult>;
   remove(tournamentId: string, bountyId: string): Promise<void>;
 }
 
@@ -79,7 +87,11 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
     const teamNameById = new Map(teams.map((t) => [t.id, t.name]));
 
     const playerIds = [
-      ...new Set(bounties.filter((b) => b.targetType === "player").map((b) => b.targetId)),
+      ...new Set(
+        bounties
+          .filter((b) => b.targetType === "player" && b.targetId)
+          .map((b) => b.targetId as string),
+      ),
     ];
     const nameByUser = new Map<string, string>();
     for (const id of playerIds) {
@@ -90,9 +102,13 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
     return bounties.map((b) => ({
       id: b.id,
       targetType: b.targetType,
+      open: b.open,
       targetId: b.targetId,
-      targetName:
-        b.targetType === "team" ? (teamNameById.get(b.targetId) ?? null) : (nameByUser.get(b.targetId) ?? null),
+      targetName: !b.targetId
+        ? null
+        : b.targetType === "team"
+          ? (teamNameById.get(b.targetId) ?? null)
+          : (nameByUser.get(b.targetId) ?? null),
       description: b.description,
       coinValue: b.coinValue,
       active: b.active,
@@ -109,6 +125,39 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
     return bounty;
   }
 
+  /** Verify a target exists in the tournament (throws NotFound otherwise). */
+  async function validateTarget(
+    tournamentId: string,
+    targetType: BountyTargetType,
+    targetId: string,
+  ): Promise<void> {
+    if (targetType === "player") {
+      const membership = await deps.memberships.findByUserAndTournament(targetId, tournamentId);
+      if (!membership) throw new NotFoundError("Player is not a member of this tournament");
+    } else {
+      const team = await deps.teams.findById(targetId);
+      if (!team || team.tournamentId !== tournamentId) {
+        throw new NotFoundError("Team is not part of this tournament");
+      }
+    }
+  }
+
+  /** The user ids credited when a target wins: the player, or every team member. */
+  async function resolveRecipients(
+    tournamentId: string,
+    targetType: BountyTargetType,
+    targetId: string,
+  ): Promise<string[]> {
+    if (targetType === "player") {
+      const membership = await deps.memberships.findByUserAndTournament(targetId, tournamentId);
+      if (!membership) throw new ValidationError("That player is no longer in this tournament");
+      return [targetId];
+    }
+    const members = await deps.memberships.listByTeam(targetId);
+    if (members.length === 0) throw new ValidationError("That team has no players to credit");
+    return members.map((m) => m.userId);
+  }
+
   return {
     async create({ tournamentId, targetType, targetId, description, coinValue }) {
       const desc = description.trim();
@@ -120,21 +169,16 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
         throw new ValidationError(`Coin value must be at most ${MAX_COIN_ADJUSTMENT}`);
       }
 
-      // The target must belong to this tournament (coins are tournament-scoped, D6).
-      if (targetType === "player") {
-        const membership = await deps.memberships.findByUserAndTournament(targetId, tournamentId);
-        if (!membership) throw new NotFoundError("Player is not a member of this tournament");
-      } else {
-        const team = await deps.teams.findById(targetId);
-        if (!team || team.tournamentId !== tournamentId) {
-          throw new NotFoundError("Team is not part of this tournament");
-        }
-      }
+      // An open bounty has no preset target (first to complete wins); a directed
+      // bounty's target must belong to this tournament (coins are scoped, D6).
+      const open = !targetId;
+      if (!open) await validateTarget(tournamentId, targetType, targetId!);
 
       const bounty = await deps.bounties.create({
         tournamentId,
         targetType,
-        targetId,
+        open,
+        targetId: open ? null : targetId!,
         description: desc,
         coinValue,
       });
@@ -154,21 +198,23 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
       );
     },
 
-    async award(tournamentId, bountyId) {
+    async award(tournamentId, bountyId, winnerId) {
       const bounty = await requireBounty(tournamentId, bountyId);
       if (!bounty.active) throw new ValidationError("This bounty has already been awarded");
 
-      // Resolve the recipients now (a team's roster can change over time).
-      let recipientIds: string[];
-      if (bounty.targetType === "player") {
-        const membership = await deps.memberships.findByUserAndTournament(bounty.targetId, tournamentId);
-        if (!membership) throw new ValidationError("The bounty's player is no longer in this tournament");
-        recipientIds = [bounty.targetId];
+      // Who won? An open bounty is decided by the winnerId the admin supplies;
+      // a directed bounty uses its preset target.
+      let recipientTargetId: string;
+      if (bounty.open) {
+        if (!winnerId) throw new ValidationError("Choose the player or team that won this open bounty");
+        await validateTarget(tournamentId, bounty.targetType, winnerId);
+        recipientTargetId = winnerId;
       } else {
-        const members = await deps.memberships.listByTeam(bounty.targetId);
-        recipientIds = members.map((m) => m.userId);
-        if (recipientIds.length === 0) throw new ValidationError("The bounty's team has no players to credit");
+        recipientTargetId = bounty.targetId!;
       }
+
+      // Resolve the recipients now (a team's roster can change over time).
+      const recipientIds = await resolveRecipients(tournamentId, bounty.targetType, recipientTargetId);
 
       const rows: NewCoinTransaction[] = recipientIds.map((userId) => ({
         tournamentId,
@@ -182,7 +228,8 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
       let updated!: BountyRecord;
       await deps.uow.run(async () => {
         await deps.coinLedger.createMany(rows);
-        updated = await deps.bounties.markAwarded(bounty.id);
+        // Record the winner on an open bounty so the history shows who earned it.
+        updated = await deps.bounties.markAwarded(bounty.id, bounty.open ? recipientTargetId : undefined);
       });
 
       const [view] = await toViews(tournamentId, [updated]);

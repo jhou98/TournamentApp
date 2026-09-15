@@ -118,6 +118,9 @@ function buildService(stores: Stores): PlayoffsService {
     async updateConfig() {
       throw new Error("not used");
     },
+    async updateRules() {
+      throw new Error("not used");
+    },
   };
 
   const matchups: MatchupRepo = {

@@ -18,6 +18,7 @@ const MAX_COIN_ADJUSTMENT = 1_000_000;
  */
 export function AdminCoins() {
   const { activeTournamentId } = useAuth();
+  const { showToast } = useToast();
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -41,6 +42,27 @@ export function AdminCoins() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTournamentId]);
 
+  async function resetAll() {
+    if (
+      !window.confirm(
+        "Reset ALL coin balances in this tournament to zero? This writes a reversing entry for every player (auditable — not a delete).",
+      )
+    )
+      return;
+    try {
+      const res = await api<{ playersReset: number }>("/admin/coins/reset", { method: "POST" });
+      showToast(
+        res.playersReset === 0
+          ? "Nothing to reset — all balances are already zero."
+          : `Reset coins for ${res.playersReset} ${res.playersReset === 1 ? "player" : "players"}.`,
+        "success",
+      );
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not reset coins", "error");
+    }
+  }
+
   return (
     <>
       {error && <Alert tone="error">{error}</Alert>}
@@ -55,6 +77,11 @@ export function AdminCoins() {
         <Card
           title="Adjust coins"
           subtitle="Credit or debit a player. Use a negative amount to reverse coins; add a note for the audit log."
+          action={
+            <Button variant="danger" size="sm" icon="bolt" onClick={resetAll}>
+              Reset all coins
+            </Button>
+          }
         >
           <ul className="divide-y divide-line">
             {rows.map((r) => (

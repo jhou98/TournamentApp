@@ -49,4 +49,9 @@ export interface TournamentRepo {
   create(input: NewTournament): Promise<TournamentDetail>;
   setStatus(id: string, status: TournamentStatus): Promise<void>;
   updateConfig(id: string, patch: Partial<TournamentConfig>): Promise<TournamentDetail>;
+  /** Update the coin and/or streak rule JSON blobs (D4/D16). */
+  updateRules(
+    id: string,
+    patch: { coinRule?: CoinRule; streakRule?: StreakRule },
+  ): Promise<TournamentDetail>;
 }

@@ -104,6 +104,9 @@ function buildService(stores: Stores): SuddenDeathService {
     async updateConfig() {
       throw new Error("not used");
     },
+    async updateRules() {
+      throw new Error("not used");
+    },
   };
 
   const matchups: MatchupRepo = {
@@ -267,6 +270,15 @@ function buildService(stores: Stores): SuddenDeathService {
       return { rows: [] };
     },
     async adjustCoins() {
+      throw new Error("not used");
+    },
+    async resetCoins() {
+      throw new Error("not used");
+    },
+    async getRules() {
+      throw new Error("not used");
+    },
+    async updateRules() {
       throw new Error("not used");
     },
   };
