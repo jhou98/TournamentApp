@@ -1,0 +1,232 @@
+name: Deploy to AWS
+
+# Manual deploy: provisions/updates the CDK infrastructure for the chosen
+# environment and publishes the chosen branch onto its EC2 box. Build + lint +
+# tests + CFN validation run first (the `ci` job) and gate the deploy.
+#
+# Per-environment AWS config uses GitHub Environments (Settings -> Environments):
+# set these as environment-scoped variables/secrets on each of prod/staging/dev
+# (see infra/README.md):
+#   Variables: AWS_REGION, AWS_DEPLOY_ROLE_ARN
+#   Secrets:   BOOTSTRAP_ADMIN_CODE
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment.
+        type: choice
+        options: [prod, staging, dev]
+        default: dev
+      ref:
+        description: Branch or tag to deploy (e.g. main or a feature branch).
+        type: string
+        required: true
+        default: main
+      confirm:
+        description: Type "deploy" to confirm.
+        type: string
+        required: true
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # required for AWS OIDC
+
+jobs:
+  preflight:
+    name: Confirm
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ inputs.confirm }}" = "deploy" ] || { echo "::error::Type 'deploy' in the confirm box to proceed."; exit 1; }
+          echo "Deploying ref '${{ inputs.ref }}' to '${{ inputs.environment }}'."
+
+  ci:
+    name: Pre-deploy checks
+    needs: preflight
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.ref }}
+
+  deploy:
+    name: Provision infra & publish app
+    needs: [preflight, ci]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+    steps:
+      - name: Validate environment config
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          BOOTSTRAP_ADMIN_CODE: ${{ secrets.BOOTSTRAP_ADMIN_CODE }}
+        run: |
+          set -e
+          [ -n "$AWS_DEPLOY_ROLE_ARN" ] || { echo "::error::Missing variable AWS_DEPLOY_ROLE_ARN for '${{ inputs.environment }}' (deploy the OIDC stack first)."; exit 1; }
+          [ -n "$AWS_REGION" ] || { echo "::error::Missing variable AWS_REGION for '${{ inputs.environment }}'."; exit 1; }
+          [ -n "$BOOTSTRAP_ADMIN_CODE" ] || { echo "::error::Missing secret BOOTSTRAP_ADMIN_CODE for '${{ inputs.environment }}'."; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # --- Build the application release artifact -------------------------------
+      - name: Install app dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate -w server
+      - name: Build app
+        run: npm run build
+      - name: Package release artifact
+        id: package
+        run: |
+          set -euo pipefail
+          SHA=$(git rev-parse HEAD)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          tar -czf "$RUNNER_TEMP/release.tar.gz" \
+            package.json package-lock.json \
+            server/dist server/package.json server/prisma \
+            client/package.json client/dist \
+            infra/scripts
+          echo "Packaged release $SHA"
+
+      # --- Configure AWS access (OIDC, no stored keys) -------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # --- Provision / update the CDK infrastructure --------------------------
+      - name: Install CDK deps
+        working-directory: infra
+        run: npm ci
+      - name: Deploy CDK stack
+        working-directory: infra
+        run: |
+          set -euo pipefail
+          npx cdk deploy TournamentAppInfra \
+            -c env=${{ inputs.environment }} \
+            --require-approval never \
+            --outputs-file cdk-outputs.json \
+            --parameters "BootstrapAdminCode=${{ secrets.BOOTSTRAP_ADMIN_CODE }}"
+      - name: Read stack outputs
+        id: outputs
+        working-directory: infra
+        run: |
+          set -euo pipefail
+          O=cdk-outputs.json
+          get() { jq -r "to_entries[0].value.$1" "$O"; }
+          {
+            echo "bucket=$(get ArtifactsBucketName)"
+            echo "instance_id=$(get InstanceId)"
+            echo "db_endpoint=$(get DBEndpoint)"
+            echo "db_port=$(get DBPort)"
+            echo "db_name=$(get DBName)"
+            echo "db_secret_arn=$(get DBSecretArn)"
+            echo "app_secret_arn=$(get AppSecretArn)"
+            echo "app_port=$(get AppPort)"
+            echo "public_ip=$(get PublicIp)"
+          } >> "$GITHUB_OUTPUT"
+
+      # --- Publish the app onto the box via SSM -------------------------------
+      - name: Upload release artifact to S3
+        id: upload
+        env:
+          BUCKET: ${{ steps.outputs.outputs.bucket }}
+          SHA: ${{ steps.package.outputs.sha }}
+        run: |
+          set -euo pipefail
+          KEY="releases/${SHA}.tar.gz"
+          aws s3 cp "$RUNNER_TEMP/release.tar.gz" "s3://${BUCKET}/${KEY}"
+          echo "key=$KEY" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy release on the box (SSM)
+        env:
+          INSTANCE_ID: ${{ steps.outputs.outputs.instance_id }}
+          BUCKET: ${{ steps.outputs.outputs.bucket }}
+          KEY: ${{ steps.upload.outputs.key }}
+          SHA: ${{ steps.package.outputs.sha }}
+          REGION: ${{ vars.AWS_REGION }}
+          DB_ENDPOINT: ${{ steps.outputs.outputs.db_endpoint }}
+          DB_PORT: ${{ steps.outputs.outputs.db_port }}
+          DB_NAME: ${{ steps.outputs.outputs.db_name }}
+          DB_SECRET_ARN: ${{ steps.outputs.outputs.db_secret_arn }}
+          APP_SECRET_ARN: ${{ steps.outputs.outputs.app_secret_arn }}
+          APP_PORT: ${{ steps.outputs.outputs.app_port }}
+        run: |
+          set -euo pipefail
+
+          # Build the on-box command. Runner env values are expanded now; on-box
+          # variable references are escaped (\$) so they resolve on the instance.
+          SCRIPT=$(cat <<EOF
+          set -e
+          export ARTIFACT_BUCKET="$BUCKET"
+          export ARTIFACT_KEY="$KEY"
+          export RELEASE_SHA="$SHA"
+          export AWS_REGION="$REGION"
+          export DB_ENDPOINT="$DB_ENDPOINT"
+          export DB_PORT="$DB_PORT"
+          export DB_NAME="$DB_NAME"
+          export DB_SECRET_ARN="$DB_SECRET_ARN"
+          export APP_SECRET_ARN="$APP_SECRET_ARN"
+          export APP_PORT="$APP_PORT"
+          aws s3 cp "s3://\$ARTIFACT_BUCKET/\$ARTIFACT_KEY" /tmp/bootstrap.tar.gz --region "\$AWS_REGION"
+          rm -rf /tmp/bootstrap && mkdir -p /tmp/bootstrap
+          tar -xzf /tmp/bootstrap.tar.gz -C /tmp/bootstrap infra/scripts/deploy-on-box.sh
+          bash /tmp/bootstrap/infra/scripts/deploy-on-box.sh
+          EOF
+          )
+
+          jq -n --arg s "$SCRIPT" '{commands: [$s]}' > /tmp/ssm-params.json
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy ${SHA:0:8}" \
+            --parameters file:///tmp/ssm-params.json \
+            --query Command.CommandId --output text)
+          echo "SSM command id: $CMD_ID"
+
+          for _ in $(seq 1 90); do
+            STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
+            echo "status: $STATUS"
+            case "$STATUS" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|Undeliverable|Terminated)
+                echo "::error::On-box deploy failed ($STATUS)"
+                echo "----- stderr -----"
+                aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardErrorContent --output text || true
+                echo "----- stdout -----"
+                aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text || true
+                exit 1 ;;
+              *) sleep 10 ;;
+            esac
+          done
+          echo "----- on-box output -----"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text
+
+      - name: Summary
+        env:
+          IP: ${{ steps.outputs.outputs.public_ip }}
+          PORT: ${{ steps.outputs.outputs.app_port }}
+          SHA: ${{ steps.package.outputs.sha }}
+        run: |
+          {
+            echo "### Deploy complete :rocket:"
+            echo ""
+            echo "- Environment: \`${{ inputs.environment }}\`"
+            echo "- Ref: \`${{ inputs.ref }}\` (\`${SHA:0:8}\`)"
+            echo "- App: http://${IP}:${PORT}"
+            echo ""
+            echo "_App port is public until Caddy fronts 80/443._"
+          } >> "$GITHUB_STEP_SUMMARY"

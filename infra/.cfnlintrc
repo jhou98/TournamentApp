@@ -1,0 +1,8 @@
+# Ignored checks are false positives against valid, intentional config:
+#   W3005 - redundant DependsOn in CDK-generated custom-resource scaffolding.
+#   E3062 - cfn-lint's instance-class list omits the valid free-tier db.t4g.micro.
+#   W3691 - cfn-lint flags current PostgreSQL 16 minors as deprecated (we pin major "16").
+ignore_checks:
+  - W3005
+  - E3062
+  - W3691
