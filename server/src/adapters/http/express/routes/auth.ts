@@ -1,14 +1,14 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
-import { ValidationError } from "../../../../domain/errors.js";
 import type { AuthService } from "../../../../services/authService.js";
 import { asyncHandler } from "../asyncHandler.js";
+import { parse, safeText } from "../validation.js";
 import { AUTH_COOKIE } from "../middleware/auth.js";
 
 const signupSchema = z.object({
-  username: z.string().trim().min(3).max(30),
+  username: safeText({ min: 3, max: 30 }),
   password: z.string().min(8).max(200),
-  displayName: z.string().trim().min(1).max(60),
+  displayName: safeText({ min: 1, max: 60 }),
   inviteCode: z.string().trim().min(1).optional(),
 });
 
@@ -27,14 +27,6 @@ function setAuthCookie(res: Response, token: string) {
     maxAge: MAX_AGE_MS,
     path: "/",
   });
-}
-
-function parse<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
-  const result = schema.safeParse(body);
-  if (!result.success) {
-    throw new ValidationError(result.error.issues.map((i) => i.message).join("; "));
-  }
-  return result.data;
 }
 
 export function authRouter(auth: AuthService): Router {

@@ -1,21 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
-import { ValidationError } from "../../../../domain/errors.js";
 import type { LineupService } from "../../../../services/lineupService.js";
 import type { SuddenDeathService } from "../../../../services/suddenDeathService.js";
 import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { makeResolveTournament } from "../middleware/tournament.js";
 import { asyncHandler } from "../asyncHandler.js";
+import { parse } from "../validation.js";
 import { requireParam } from "../params.js";
-
-function parse<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
-  const result = schema.safeParse(body);
-  if (!result.success) {
-    throw new ValidationError(result.error.issues.map((i) => i.message).join("; "));
-  }
-  return result.data;
-}
 
 const submitSchema = z.object({
   teamId: z.string().min(1),

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Container } from "../../../config/container.js";
 import { errorMiddleware } from "./errorMiddleware.js";
+import { securityHeaders, makeSqlInjectionGuard } from "./middleware/security.js";
 import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
@@ -19,10 +20,15 @@ import { tournamentsRouter } from "./routes/tournaments.js";
 export function createApp(container: Container): Express {
   const app = express();
 
-  app.use(express.json());
+  app.disable("x-powered-by");
+  app.use(securityHeaders);
+  // Cap request bodies so an attacker can't send a huge payload to probe or DoS.
+  app.use(express.json({ limit: "100kb" }));
   app.use(cookieParser());
 
   const api = Router();
+  // Screen every API request for SQL-injection patterns before it reaches a route.
+  api.use(makeSqlInjectionGuard());
   api.use("/health", healthRouter(container.services.health));
   api.use("/auth", authRouter(container.services.auth));
   api.use(
