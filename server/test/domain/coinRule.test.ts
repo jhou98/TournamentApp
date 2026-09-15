@@ -20,11 +20,6 @@ describe("computeCoinDelta", () => {
     expect(computeCoinDelta(rule, result({ win: true }))).toBe(100);
   });
 
-  it("adds flatPerGame on top of perWin", () => {
-    const rule: CoinRule = { perWin: 100, perLoss: 50, flatPerGame: 10 };
-    expect(computeCoinDelta(rule, result({ win: true }))).toBe(110);
-  });
-
   it("credits perLoss on a plain loss", () => {
     const rule: CoinRule = { perWin: 100, perLoss: 50, perCloseLoss: 75 };
     expect(computeCoinDelta(rule, result({ loss: true, closeLoss: false }))).toBe(50);

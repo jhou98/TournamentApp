@@ -306,7 +306,6 @@ const COIN_FIELDS: { key: CoinField; label: string; help: string; required?: boo
     label: "Per point differential",
     help: "Extra coins per point of score margin — added for winners, subtracted for losers.",
   },
-  { key: "flatPerGame", label: "Flat coins per game", help: "Coins every player earns just for playing a game, win or lose." },
   { key: "floor", label: "Floor (min per game)", help: "The fewest coins a player can come away with from one game." },
 ];
 

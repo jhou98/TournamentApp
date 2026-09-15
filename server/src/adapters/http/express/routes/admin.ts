@@ -103,7 +103,6 @@ const coinRuleSchema = z.object({
   perLoss: coinInt,
   perCloseLoss: coinInt.optional(),
   perPointDiff: z.number().min(-MAX_COIN_ADJUSTMENT).max(MAX_COIN_ADJUSTMENT).optional(),
-  flatPerGame: coinInt.optional(),
   floor: coinInt.optional(),
   closeLossMargin: z.number().int().positive().optional(),
 });

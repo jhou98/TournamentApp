@@ -190,7 +190,6 @@ export interface CoinRule {
   perLoss: number;
   perCloseLoss?: number;
   perPointDiff?: number;
-  flatPerGame?: number;
   floor?: number;
   closeLossMargin?: number;
 }

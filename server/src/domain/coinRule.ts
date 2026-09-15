@@ -21,7 +21,6 @@ export interface CoinRule {
   perLoss: number;
   perCloseLoss?: number;
   perPointDiff?: number;
-  flatPerGame?: number;
   floor?: number;
   closeLossMargin?: number;
 }
@@ -42,7 +41,7 @@ export interface PlayerGameResult {
  * applied last, after every additive term. The result is always an integer.
  */
 export function computeCoinDelta(rule: CoinRule, result: PlayerGameResult): number {
-  let delta = rule.flatPerGame ?? 0;
+  let delta = 0;
 
   if (result.win) {
     delta += rule.perWin;
