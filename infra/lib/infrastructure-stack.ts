@@ -7,31 +7,20 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 
 export interface InfrastructureStackProps extends cdk.StackProps {
-  /** Base name used for resource naming (e.g. "tournamentapp"). */
   readonly appName: string;
-  /** Port the Node server listens on (and, for now, is exposed publicly on). */
+  readonly environment: string;
   readonly appPort: number;
 }
 
-/**
- * TournamentApp base infrastructure:
- *   - a dedicated VPC (2 public subnets for the box, 2 isolated subnets for the DB)
- *   - a public EC2 box with an Elastic IP, serving the API + built SPA
- *   - a private RDS PostgreSQL instance reachable only from the app security group
- *   - a private S3 bucket for release artifacts
- *   - Secrets Manager for DB creds + app secrets
- *
- * NOTE: the design doc specifies Aurora Serverless v2; this uses plain RDS
- * PostgreSQL per the project owner's request. Prisma's connection string is
- * identical either way.
- */
+/** TournamentApp infrastructure: a public EC2 box + private RDS Postgres. */
 export class InfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: InfrastructureStackProps) {
     super(scope, id, props);
 
-    const { appName, appPort } = props;
+    const { appName, environment, appPort } = props;
+    const prefix = `${appName}-${environment}`;
 
-    // BOOTSTRAP_ADMIN_CODE is passed at deploy time (never stored in the repo).
+    // Passed at deploy time; never stored in the repo.
     const bootstrapAdminCode = new cdk.CfnParameter(this, "BootstrapAdminCode", {
       type: "String",
       noEcho: true,
@@ -39,42 +28,34 @@ export class InfrastructureStack extends cdk.Stack {
       description: "First-admin signup code (BOOTSTRAP_ADMIN_CODE), stored in Secrets Manager.",
     });
 
-    // ----------------------------------------------------------------- Networking
     const vpc = new ec2.Vpc(this, "Vpc", {
       maxAzs: 2,
-      natGateways: 0, // no NAT: the box is in a public subnet; the DB needs no egress.
+      natGateways: 0, // box is in a public subnet; the DB needs no egress.
       subnetConfiguration: [
         { name: "public", subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
         { name: "db", subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
       ],
     });
 
-    // ------------------------------------------------------------ Security groups
     const appSg = new ec2.SecurityGroup(this, "AppSg", {
       vpc,
-      description: "TournamentApp EC2 box - public web access.",
+      description: `${prefix} EC2 box - public web access.`,
       allowAllOutbound: true,
     });
     appSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), "HTTP (future Caddy reverse proxy)");
     appSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), "HTTPS (future Caddy reverse proxy)");
-    // TEMPORARY: the Node app port is exposed publicly so the app is reachable at
-    // http://<EIP>:<appPort> before Caddy is added. Remove once Caddy fronts 80/443.
-    appSg.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(appPort),
-      "Node app port (temporary public access until Caddy is added)",
-    );
+    // Temporary: exposes the app at http://<EIP>:<appPort> until Caddy fronts 80/443.
+    appSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(appPort), "Node app port (temporary)");
 
     const dbSg = new ec2.SecurityGroup(this, "DbSg", {
       vpc,
-      description: "TournamentApp RDS - private, only from the app security group.",
+      description: `${prefix} RDS - private, only from the app security group.`,
       allowAllOutbound: false,
     });
     dbSg.addIngressRule(appSg, ec2.Port.tcp(5432), "PostgreSQL from the app security group only");
 
-    // ------------------------------------------------------------------- Secrets
     const appSecret = new secretsmanager.Secret(this, "AppSecret", {
-      secretName: `${appName}/app`,
+      secretName: `${appName}/${environment}/app`,
       description: "App secrets: JWT_SECRET (generated) and BOOTSTRAP_ADMIN_CODE (provided).",
       generateSecretString: {
         secretStringTemplate: this.toJsonString({
@@ -86,10 +67,8 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
-    // ----------------------------------------------------------------------- RDS
     const database = new rds.DatabaseInstance(this, "Database", {
-      // Major-version only: RDS selects a supported minor at deploy time, which
-      // avoids pinning to a minor that later gets deprecated.
+      // Major-version only: RDS selects a supported minor at deploy time.
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.of("16", "16"),
       }),
@@ -98,7 +77,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       securityGroups: [dbSg],
       credentials: rds.Credentials.fromGeneratedSecret("tournament", {
-        secretName: `${appName}/db`,
+        secretName: `${appName}/${environment}/db`,
       }),
       databaseName: "tournament",
       allocatedStorage: 20,
@@ -111,9 +90,8 @@ export class InfrastructureStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
     });
 
-    // ------------------------------------------------------------- S3 artifacts
     const artifactsBucket = new s3.Bucket(this, "Artifacts", {
-      bucketName: `${appName}-artifacts-${this.account}`,
+      bucketName: `${prefix}-artifacts-${this.account}`,
       versioned: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -129,7 +107,6 @@ export class InfrastructureStack extends cdk.Stack {
       ],
     });
 
-    // -------------------------------------------------------- EC2 + instance role
     const instanceRole = new iam.Role(this, "InstanceRole", {
       assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
       managedPolicies: [
@@ -143,17 +120,13 @@ export class InfrastructureStack extends cdk.Stack {
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
       "set -euxo pipefail",
-      // Node 20 (NodeSource) + tooling.
       "curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -",
       "dnf install -y nodejs git jq tar gzip unzip",
-      // AWS CLI v2 (not preinstalled on AL2023 minimal).
       'if ! command -v aws >/dev/null 2>&1; then curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip && unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install; fi',
-      // App user + directory layout (releases/<sha> with a "current" symlink).
       "id -u tournament >/dev/null 2>&1 || useradd --system --home /opt/tournamentapp --shell /usr/sbin/nologin tournament",
       "mkdir -p /opt/tournamentapp/releases",
       "chown -R tournament:tournament /opt/tournamentapp",
-      // systemd unit. WorkingDirectory is the server dir so the app resolves
-      // ../client/dist for the SPA and reads server/.env via dotenv.
+      // WorkingDirectory is the server dir so the app resolves ../client/dist and reads server/.env.
       "cat >/etc/systemd/system/tournamentapp.service <<'UNIT'",
       "[Unit]",
       "Description=TournamentApp (Node/Express)",
@@ -172,7 +145,6 @@ export class InfrastructureStack extends cdk.Stack {
       "WantedBy=multi-user.target",
       "UNIT",
       "systemctl daemon-reload",
-      // Enable now; it starts serving after the first deploy populates current/.
       "systemctl enable tournamentapp.service || true",
     );
 
@@ -189,46 +161,23 @@ export class InfrastructureStack extends cdk.Stack {
     const eip = new ec2.CfnEIP(this, "Eip", {
       domain: "vpc",
       instanceId: instance.instanceId,
-      tags: [{ key: "Name", value: `${appName}-eip` }],
+      tags: [{ key: "Name", value: `${prefix}-eip` }],
     });
 
-    // --------------------------------------------------------------------- Outputs
-    new cdk.CfnOutput(this, "PublicIp", {
-      description: "Elastic IP of the app box.",
-      value: eip.ref,
-    });
-    new cdk.CfnOutput(this, "AppUrl", {
-      description: "Temporary app URL (pre-Caddy).",
-      value: `http://${eip.ref}:${appPort}`,
-    });
-    new cdk.CfnOutput(this, "InstanceId", {
-      description: "EC2 instance id (target of SSM deploy commands).",
-      value: instance.instanceId,
-    });
-    new cdk.CfnOutput(this, "ArtifactsBucketName", {
-      description: "S3 bucket for release artifacts.",
-      value: artifactsBucket.bucketName,
-    });
-    new cdk.CfnOutput(this, "DBEndpoint", {
-      description: "RDS writer endpoint (private).",
-      value: database.dbInstanceEndpointAddress,
-    });
-    new cdk.CfnOutput(this, "DBPort", {
-      description: "RDS port.",
-      value: database.dbInstanceEndpointPort,
-    });
-    new cdk.CfnOutput(this, "DBName", { description: "Database name.", value: "tournament" });
-    new cdk.CfnOutput(this, "DBSecretArn", {
-      description: "Secrets Manager ARN holding DB master username/password.",
-      value: database.secret!.secretArn,
-    });
-    new cdk.CfnOutput(this, "AppSecretArn", {
-      description: "Secrets Manager ARN holding JWT_SECRET and BOOTSTRAP_ADMIN_CODE.",
-      value: appSecret.secretArn,
-    });
-    new cdk.CfnOutput(this, "AppPort", {
-      description: "Port the Node server listens on.",
-      value: String(appPort),
-    });
+    const outputs: Record<string, string> = {
+      PublicIp: eip.ref,
+      AppUrl: `http://${eip.ref}:${appPort}`,
+      InstanceId: instance.instanceId,
+      ArtifactsBucketName: artifactsBucket.bucketName,
+      DBEndpoint: database.dbInstanceEndpointAddress,
+      DBPort: database.dbInstanceEndpointPort,
+      DBName: "tournament",
+      DBSecretArn: database.secret!.secretArn,
+      AppSecretArn: appSecret.secretArn,
+      AppPort: String(appPort),
+    };
+    for (const [key, value] of Object.entries(outputs)) {
+      new cdk.CfnOutput(this, key, { value });
+    }
   }
 }

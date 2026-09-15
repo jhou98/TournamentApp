@@ -1,27 +1,34 @@
-name: Deploy to AWS (prod)
+name: Deploy to AWS
 
-# Manual deploy: provisions/updates the CDK infrastructure and publishes the
-# chosen branch onto the EC2 box. Build + lint + tests + CFN validation run first
-# (the `ci` job below) and gate the deploy.
+# Manual deploy: provisions/updates the CDK infrastructure for the chosen
+# environment and publishes the chosen branch onto its EC2 box. Build + lint +
+# tests + CFN validation run first (the `ci` job) and gate the deploy.
 #
-# Required repo configuration (see infra/README.md):
-#   Variables: AWS_REGION, AWS_DEPLOY_ROLE_ARN   (optional: CFN_STACK_NAME)
+# Per-environment AWS config uses GitHub Environments (Settings -> Environments):
+# set these as environment-scoped variables/secrets on each of prod/staging/dev
+# (see infra/README.md):
+#   Variables: AWS_REGION, AWS_DEPLOY_ROLE_ARN
 #   Secrets:   BOOTSTRAP_ADMIN_CODE
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: Target environment.
+        type: choice
+        options: [prod, staging, dev]
+        default: dev
       ref:
         description: Branch or tag to deploy (e.g. main or a feature branch).
         type: string
         required: true
         default: main
       confirm:
-        description: Type "deploy" to confirm a production deploy.
+        description: Type "deploy" to confirm.
         type: string
         required: true
 
 concurrency:
-  group: deploy-prod
+  group: deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
 permissions:
@@ -30,21 +37,12 @@ permissions:
 
 jobs:
   preflight:
-    name: Preflight checks
+    name: Confirm
     runs-on: ubuntu-latest
     steps:
-      - name: Validate confirmation and required config
-        env:
-          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          AWS_REGION: ${{ vars.AWS_REGION }}
-          BOOTSTRAP_ADMIN_CODE: ${{ secrets.BOOTSTRAP_ADMIN_CODE }}
-        run: |
-          set -e
+      - run: |
           [ "${{ inputs.confirm }}" = "deploy" ] || { echo "::error::Type 'deploy' in the confirm box to proceed."; exit 1; }
-          [ -n "$AWS_DEPLOY_ROLE_ARN" ] || { echo "::error::Missing repo variable AWS_DEPLOY_ROLE_ARN (deploy the OIDC stack first)."; exit 1; }
-          [ -n "$AWS_REGION" ] || { echo "::error::Missing repo variable AWS_REGION."; exit 1; }
-          [ -n "$BOOTSTRAP_ADMIN_CODE" ] || { echo "::error::Missing repo secret BOOTSTRAP_ADMIN_CODE."; exit 1; }
-          echo "Preflight OK — deploying ref '${{ inputs.ref }}'."
+          echo "Deploying ref '${{ inputs.ref }}' to '${{ inputs.environment }}'."
 
   ci:
     name: Pre-deploy checks
@@ -57,11 +55,22 @@ jobs:
     name: Provision infra & publish app
     needs: [preflight, ci]
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ inputs.environment }}
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
       DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
     steps:
+      - name: Validate environment config
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          BOOTSTRAP_ADMIN_CODE: ${{ secrets.BOOTSTRAP_ADMIN_CODE }}
+        run: |
+          set -e
+          [ -n "$AWS_DEPLOY_ROLE_ARN" ] || { echo "::error::Missing variable AWS_DEPLOY_ROLE_ARN for '${{ inputs.environment }}' (deploy the OIDC stack first)."; exit 1; }
+          [ -n "$AWS_REGION" ] || { echo "::error::Missing variable AWS_REGION for '${{ inputs.environment }}'."; exit 1; }
+          [ -n "$BOOTSTRAP_ADMIN_CODE" ] || { echo "::error::Missing secret BOOTSTRAP_ADMIN_CODE for '${{ inputs.environment }}'."; exit 1; }
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -107,6 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           npx cdk deploy TournamentAppInfra \
+            -c env=${{ inputs.environment }} \
             --require-approval never \
             --outputs-file cdk-outputs.json \
             --parameters "BootstrapAdminCode=${{ secrets.BOOTSTRAP_ADMIN_CODE }}"
@@ -214,6 +224,7 @@ jobs:
           {
             echo "### Deploy complete :rocket:"
             echo ""
+            echo "- Environment: \`${{ inputs.environment }}\`"
             echo "- Ref: \`${{ inputs.ref }}\` (\`${SHA:0:8}\`)"
             echo "- App: http://${IP}:${PORT}"
             echo ""

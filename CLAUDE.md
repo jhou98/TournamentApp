@@ -34,8 +34,8 @@ npm run db:studio
 - **For browser verification use http://localhost:4000** (server serves the API + app). `:5173` is
   the raw Vite port and flakes with 500s — don't verify against it.
 - `.env` lives in **`server/.env`** (that's where Prisma and the server read it), not repo root.
-  Copy from `server/.env.example`. Postgres via `docker compose up -d` (:5432) or an Aurora
-  Serverless (Postgres) string (`sslmode=require`, both URLs = the writer endpoint).
+  Copy from `server/.env.example`. Postgres via `docker compose up -d` (:5432) or an RDS
+  PostgreSQL string (`sslmode=require`, both URLs = the instance endpoint).
 - Node 20 (`.nvmrc`).
 
 ## Where things live

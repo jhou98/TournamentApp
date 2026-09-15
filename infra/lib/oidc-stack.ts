@@ -3,17 +3,12 @@ import { Construct } from "constructs";
 import * as iam from "aws-cdk-lib/aws-iam";
 
 export interface OidcStackProps extends cdk.StackProps {
-  /** Base name used for resource naming (e.g. "tournamentapp"). */
   readonly appName: string;
-  /** GitHub org/user that owns the repo. */
+  readonly environment: string;
   readonly githubOrg: string;
-  /** Repository name (without owner prefix). */
   readonly githubRepo: string;
-  /**
-   * Set to true if the GitHub OIDC provider already exists in this account
-   * (only one per account is allowed). When true, `existingOidcProviderArn`
-   * must be supplied via context.
-   */
+  // Set true (or `-c useExistingProvider=true`) if the account already has a
+  // GitHub OIDC provider (only one per account is allowed).
   readonly useExistingProvider?: boolean;
 }
 
@@ -49,9 +44,11 @@ export class OidcStack extends cdk.Stack {
 
     const subject = `repo:${props.githubOrg}/${props.githubRepo}:*`;
 
+    const prefix = `${props.appName}-${props.environment}`;
+
     const deployRole = new iam.Role(this, "DeployRole", {
-      roleName: `${props.appName}-github-deploy`,
-      description: "Assumed by GitHub Actions (OIDC) to deploy TournamentApp.",
+      roleName: `${prefix}-github-deploy`,
+      description: `Assumed by GitHub Actions (OIDC) to deploy TournamentApp (${props.environment}).`,
       maxSessionDuration: cdk.Duration.hours(1),
       assumedBy: new iam.WebIdentityPrincipal(provider.openIdConnectProviderArn, {
         StringEquals: {
@@ -93,7 +90,7 @@ export class OidcStack extends cdk.Stack {
     );
 
     // (c) Stage release artifacts in the app's artifacts bucket.
-    const artifactsBucketArn = `arn:aws:s3:::${props.appName}-artifacts-${this.account}`;
+    const artifactsBucketArn = `arn:aws:s3:::${prefix}-artifacts-${this.account}`;
     deployRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "StageArtifacts",

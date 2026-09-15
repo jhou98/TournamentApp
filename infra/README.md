@@ -12,10 +12,16 @@ Base hosted shape for TournamentApp and the CI/CD that ships to it.
 - **Artifacts:** releases are staged in a private, versioned **S3** bucket and pulled onto the box via
   **SSM Run Command** (no SSH keys).
 
-> **Drift from the design doc:** `artifacts/artifact.md` (D8/D15) specifies **Aurora Serverless v2**.
-> This stack uses **plain RDS PostgreSQL** per the project owner's request. Prisma's connection string
-> is identical either way, so the app code is unaffected — the doc is intent; the code/infra is
-> authoritative (per `CLAUDE.md`).
+## Environments
+
+The stacks are parameterized by environment (`prod` / `staging` / `dev`, and new ones later) via
+`-c env=<name>`. Each environment gets its own isolated set of resources — separate VPC, EC2 box, RDS
+instance, S3 bucket, secrets, and deploy role — named `tournamentapp-<env>-*`. A developer can stand
+up a personal `dev` stack in their own account/repo by passing their GitHub id
+(`-c githubOrg=<you> -c githubRepo=<repo> -c env=dev`).
+
+Per-environment AWS config is held in **GitHub Environments** (Settings → Environments → `prod` /
+`staging` / `dev`), so the deploy workflow picks up the right account/role/secret automatically.
 
 ## Security groups
 
@@ -41,10 +47,10 @@ infra/
   scripts/deploy-on-box.sh    Runs on the instance via SSM (fetch artifact, migrate, restart)
 ```
 
-CDK stacks: `TournamentAppOidc` (physical name `tournamentapp-oidc`) and `TournamentAppInfra`
-(physical name `tournamentapp`).
+CDK stacks (per environment): `TournamentAppOidc` (physical `tournamentapp-<env>-oidc`) and
+`TournamentAppInfra` (physical `tournamentapp-<env>`).
 
-## One-time bootstrap (admin, run locally with AWS credentials)
+## One-time bootstrap (admin, run locally with AWS credentials — per environment)
 
 ```bash
 cd infra
@@ -53,23 +59,22 @@ npm install
 # 1. Bootstrap CDK in the target account/region (creates the CDKToolkit stack).
 npx cdk bootstrap aws://<ACCOUNT_ID>/<REGION>
 
-# 2. Deploy the OIDC provider + GitHub deploy role. Note the DeployRoleArn output.
-#    If a GitHub OIDC provider already exists in the account, add:
-#      -c useExistingProvider=true -c existingOidcProviderArn=<arn>
-npx cdk deploy TournamentAppOidc
+# 2. Deploy the OIDC provider + GitHub deploy role for the environment. Note the
+#    DeployRoleArn output. If a GitHub OIDC provider already exists in the account:
+#      -c useExistingProvider=true
+npx cdk deploy TournamentAppOidc -c env=<prod|staging|dev>
 ```
 
-Then configure the GitHub repo (Settings → Secrets and variables → Actions):
+Then configure the matching **GitHub Environment** (Settings → Environments → `<env>`):
 
-| Kind     | Name                   | Value                                             |
-| -------- | ---------------------- | ------------------------------------------------- |
-| Variable | `AWS_REGION`           | e.g. `us-east-1`                                   |
-| Variable | `AWS_DEPLOY_ROLE_ARN`  | the `DeployRoleArn` output from `TournamentAppOidc` |
-| Secret   | `BOOTSTRAP_ADMIN_CODE` | the first-admin signup code (min 8 chars)         |
+| Kind     | Name                   | Value                                               |
+| -------- | ---------------------- | --------------------------------------------------- |
+| Variable | `AWS_REGION`           | e.g. `us-east-1`                                     |
+| Variable | `AWS_DEPLOY_ROLE_ARN`  | the `DeployRoleArn` output from the OIDC stack      |
+| Secret   | `BOOTSTRAP_ADMIN_CODE` | the first-admin signup code (min 8 chars)           |
 
-> The artifacts bucket name is derived as `tournamentapp-artifacts-<accountId>`, which the deploy
-> role's S3 policy is scoped to. If you change `appName` (via `-c appName=...`), keep it consistent
-> across both stacks.
+> The artifacts bucket is `tournamentapp-<env>-artifacts-<accountId>`, which the deploy role's S3
+> policy is scoped to. If you change `appName` (via `-c appName=...`), keep it consistent everywhere.
 
 ## Deploying
 
@@ -77,25 +82,25 @@ Everything after bootstrap is done from GitHub Actions:
 
 - **Every PR** runs `.github/workflows/pr.yml` → build + lint + unit tests, and `cdk synth` +
   `cfn-lint` on the synthesized templates.
-- **Manual deploy:** Actions → **Deploy to AWS (prod)** → run with a `ref` (branch/tag) and type
-  `deploy` to confirm. It re-runs the checks, then `cdk deploy TournamentAppInfra`, uploads the
-  release to S3, and runs `deploy-on-box.sh` on the instance via SSM. The first deploy also seeds the
-  database (default tournament + bootstrap admin).
+- **Manual deploy:** Actions → **Deploy to AWS** → pick an `environment`, a `ref` (branch/tag), and
+  type `deploy` to confirm. It re-runs the checks, then `cdk deploy TournamentAppInfra -c env=<env>`,
+  uploads the release to S3, and runs `deploy-on-box.sh` on the instance via SSM. The first deploy to
+  an environment also seeds the database (default tournament + bootstrap admin).
 
 ## Local commands
 
 ```bash
 cd infra
-npm run typecheck   # tsc --noEmit
-npm run synth       # cdk synth --all (no AWS credentials needed)
-npm run diff        # cdk diff (needs credentials)
+npm run typecheck              # tsc --noEmit
+npm run synth                  # cdk synth (no AWS credentials needed; defaults to env=dev)
+npx cdk diff -c env=prod       # cdk diff for an environment (needs credentials)
 ```
 
 ## Teardown
 
 ```bash
 cd infra
-npx cdk destroy TournamentAppInfra   # RDS leaves a final snapshot; the S3 bucket is retained
+npx cdk destroy TournamentAppInfra -c env=<env>   # RDS leaves a final snapshot; the S3 bucket is retained
 ```
 
 Free-tier notes: `t3.micro` (EC2) and `db.t4g.micro` (RDS) are free-tier eligible for 12 months;
