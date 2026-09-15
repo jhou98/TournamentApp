@@ -1,0 +1,20 @@
+# cfn-lint config for the CDK-synthesized templates (cdk.out/*.template.json).
+#
+# All three ignored checks are false positives against valid, intentional config:
+#
+# W3005 - fires only on CDK-generated custom-resource scaffolding (the VPC
+#         restrict-default-SG handler and the OIDC provider handler), where CDK
+#         emits a DependsOn already implied by a GetAtt. Framework output, not
+#         authored here.
+#
+# E3062 - cfn-lint's bundled RDS instance-class list omits db.t4g.micro, which is
+#         a real, free-tier-eligible class for PostgreSQL. The check's data is a
+#         stale/region-limited snapshot, not an actual constraint.
+#
+# W3691 - cfn-lint's bundled engine-version data marks current PostgreSQL 16
+#         minors as deprecated. We pin the major version ("16") and let RDS pick a
+#         supported minor at deploy time, so this warning is spurious.
+ignore_checks:
+  - W3005
+  - E3062
+  - W3691

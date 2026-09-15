@@ -55,5 +55,24 @@ npm run build
 npm run db:studio        # Prisma Studio
 ```
 
+## Infrastructure & deployment
+
+Base AWS infrastructure (a public EC2 box with an Elastic IP + a private RDS PostgreSQL instance) is
+defined as an **AWS CDK** app under [`infra/`](./infra/README.md), and CI/CD lives in
+[`.github/workflows/`](./.github/workflows):
+
+- **`pr.yml`** — on every pull request: build + lint + unit tests, and `cdk synth` + `cfn-lint`
+  validation of the CloudFormation templates.
+- **`deploy.yml`** — a manual "Deploy to AWS (prod)" action: runs those same checks, then provisions/
+  updates the CDK stack and publishes the chosen branch onto the EC2 box (via SSM). AWS access uses
+  GitHub OIDC — no long-lived keys.
+
+See [`infra/README.md`](./infra/README.md) for the one-time bootstrap steps and required repo
+variables/secrets.
+
+> **Note:** the design doc (`artifacts/artifact.md`) targets Aurora Serverless v2; the infra here uses
+> plain RDS PostgreSQL by request (identical Prisma connection string). Caddy/HTTPS is a planned
+> follow-up — for now the app is served directly over the Elastic IP on the app port.
+
 ## Prod Setup
 - Amazon sign-in: https://293532442953.signin.aws.amazon.com/console
