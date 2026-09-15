@@ -12,6 +12,8 @@ import { adminRouter } from "./routes/admin.js";
 import { scheduleRouter } from "./routes/schedule.js";
 import { matchupsRouter } from "./routes/matchups.js";
 import { resultsRouter } from "./routes/results.js";
+import { leaderboardRouter } from "./routes/leaderboard.js";
+import { bountiesRouter } from "./routes/bounties.js";
 import { tournamentsRouter } from "./routes/tournaments.js";
 
 export function createApp(container: Container): Express {
@@ -25,7 +27,12 @@ export function createApp(container: Container): Express {
   api.use("/auth", authRouter(container.services.auth));
   api.use(
     "/me",
-    meRouter(container.services.auth, container.services.tournaments, container.authMiddleware),
+    meRouter(
+      container.services.auth,
+      container.services.tournaments,
+      container.services.economy,
+      container.authMiddleware,
+    ),
   );
   api.use(
     "/tournaments",
@@ -39,6 +46,8 @@ export function createApp(container: Container): Express {
       container.services.results,
       container.services.playoffs,
       container.services.suddenDeath,
+      container.services.economy,
+      container.services.bounties,
       container.services.tournaments,
       container.authMiddleware,
     ),
@@ -57,6 +66,14 @@ export function createApp(container: Container): Express {
     ),
   );
   api.use(resultsRouter(container.services.results, container.services.tournaments, container.authMiddleware));
+  api.use(
+    "/leaderboard",
+    leaderboardRouter(container.services.economy, container.services.tournaments, container.authMiddleware),
+  );
+  api.use(
+    "/bounties",
+    bountiesRouter(container.services.bounties, container.services.tournaments, container.authMiddleware),
+  );
   app.use("/api", api);
 
   // Serve the built SPA in production, with history fallback for client routes.

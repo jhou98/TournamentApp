@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeResultsService, type ResultsService } from "../../src/services/resultsService.js";
+import type { EconomyService } from "../../src/services/economyService.js";
 import { ConflictError, NotFoundError, ValidationError } from "../../src/domain/errors.js";
+import { DEFAULT_COIN_RULE, DEFAULT_STREAK_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   CourtRepo,
   GameRecord,
@@ -48,6 +50,8 @@ function detail(): TournamentDetail {
     roundRobinCycles: 1,
     playoffQualifiers: 2,
     courtCount: 6,
+    coinRule: DEFAULT_COIN_RULE,
+    streakRule: DEFAULT_STREAK_RULE,
   };
 }
 
@@ -119,6 +123,9 @@ function buildService(stores: Stores): ResultsService {
     },
     async setStatus() {},
     async updateConfig() {
+      throw new Error("not used");
+    },
+    async updateRules() {
       throw new Error("not used");
     },
   };
@@ -307,6 +314,31 @@ function buildService(stores: Stores): ResultsService {
     },
   };
 
+  const economy: EconomyService = {
+    async recomputeTournamentLedger() {
+      // No-op in results-service tests — the ledger recompute itself is
+      // covered by economyService.test.ts.
+    },
+    async getCoinSummary() {
+      return { balance: 0, transactions: [] };
+    },
+    async getLeaderboard() {
+      return { rows: [] };
+    },
+    async adjustCoins() {
+      throw new Error("not used");
+    },
+    async resetCoins() {
+      throw new Error("not used");
+    },
+    async getRules() {
+      throw new Error("not used");
+    },
+    async updateRules() {
+      throw new Error("not used");
+    },
+  };
+
   return makeResultsService({
     tournaments,
     matchups,
@@ -317,6 +349,7 @@ function buildService(stores: Stores): ResultsService {
     lineups,
     games,
     uow: passthroughUow,
+    economy,
   });
 }
 

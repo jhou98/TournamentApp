@@ -1,3 +1,6 @@
+import type { CoinRule } from "../domain/coinRule.js";
+import type { StreakRule } from "../domain/streak.js";
+
 export interface TournamentRef {
   id: string;
   name: string;
@@ -24,6 +27,8 @@ export interface TournamentConfig {
 
 export interface TournamentDetail extends TournamentRef, TournamentConfig {
   status: TournamentStatus;
+  coinRule: CoinRule;
+  streakRule: StreakRule;
 }
 
 /** Everything needed to create a tournament row (config + the rules JSON blobs). */
@@ -44,4 +49,9 @@ export interface TournamentRepo {
   create(input: NewTournament): Promise<TournamentDetail>;
   setStatus(id: string, status: TournamentStatus): Promise<void>;
   updateConfig(id: string, patch: Partial<TournamentConfig>): Promise<TournamentDetail>;
+  /** Update the coin and/or streak rule JSON blobs (D4/D16). */
+  updateRules(
+    id: string,
+    patch: { coinRule?: CoinRule; streakRule?: StreakRule },
+  ): Promise<TournamentDetail>;
 }

@@ -1,13 +1,15 @@
 import { Router } from "express";
 import type { AuthService } from "../../../../services/authService.js";
+import type { EconomyService } from "../../../../services/economyService.js";
 import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { asyncHandler } from "../asyncHandler.js";
-import { requestedTournamentId } from "../middleware/tournament.js";
+import { makeResolveTournament, requestedTournamentId } from "../middleware/tournament.js";
 
 export function meRouter(
   auth: AuthService,
   tournaments: TournamentService,
+  economy: EconomyService,
   mw: AuthMiddleware,
 ): Router {
   const router = Router();
@@ -25,6 +27,17 @@ export function meRouter(
         tournamentId = null;
       }
       res.json(await auth.me(req.user!.id, tournamentId));
+    }),
+  );
+
+  // The signed-in player's coin balance + history in the active tournament (US16).
+  // Requires a resolved tournament — a balance is meaningless without one (D6).
+  router.get(
+    "/coins",
+    mw.requireAuth,
+    makeResolveTournament(tournaments),
+    asyncHandler(async (req, res) => {
+      res.json(await economy.getCoinSummary(req.tournamentId!, req.user!.id));
     }),
   );
 

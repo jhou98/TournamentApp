@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeRosterService } from "../../src/services/rosterService.js";
 import { ConflictError, ValidationError } from "../../src/domain/errors.js";
+import { DEFAULT_COIN_RULE, DEFAULT_STREAK_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
   MembershipRecord,
   MembershipRepo,
@@ -32,6 +33,8 @@ function tournamentDetail(): TournamentDetail {
     roundRobinCycles: 1,
     playoffQualifiers: 4,
     courtCount: 6,
+    coinRule: DEFAULT_COIN_RULE,
+    streakRule: DEFAULT_STREAK_RULE,
   };
 }
 
@@ -52,6 +55,9 @@ const currentTournament: TournamentRepo = {
     throw new Error("not used");
   },
   async updateConfig() {
+    throw new Error("not used");
+  },
+  async updateRules() {
     throw new Error("not used");
   },
 };

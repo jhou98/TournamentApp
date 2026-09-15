@@ -40,6 +40,21 @@ enum GameStatus {
   final
 }
 
+enum CoinReason {
+  match_result
+  streak_bonus
+  mission
+  bounty
+  event
+  purchase
+  admin_adjust
+}
+
+enum BountyTargetType {
+  player
+  team
+}
+
 // --- Core tables (Phase 0) ------------------------------------------------
 
 model User {
@@ -58,6 +73,7 @@ model User {
   pairAppearances  PairPlayer[]
   suddenDeathAsA   SuddenDeath[]  @relation("SuddenDeathTeamARep")
   suddenDeathAsB   SuddenDeath[]  @relation("SuddenDeathTeamBRep")
+  coinTransactions CoinTransaction[]
 
   @@map("user")
 }
@@ -97,9 +113,11 @@ model Tournament {
 
   createdAt DateTime @default(now())
 
-  teams    Team[]
-  matchups Matchup[]
-  courts   Court[]
+  teams            Team[]
+  matchups         Matchup[]
+  courts           Court[]
+  coinTransactions CoinTransaction[]
+  bounties         Bounty[]
 
   @@map("tournament")
 }
@@ -268,4 +286,51 @@ model SuddenDeath {
   winnerTeam Team?   @relation("SuddenDeathWinner", fields: [winnerTeamId], references: [id])
 
   @@map("sudden_death")
+}
+
+model CoinTransaction {
+  id           String     @id @default(cuid())
+  tournamentId String
+  userId       String
+  delta        Int
+  reason       CoinReason
+  // Forward references to tables that arrive in later commits — plain nullable
+  // scalars for now (no FK relation until those models exist).
+  gameId       String?
+  bountyId     String?
+  missionId    String?
+  purchaseId   String?
+  note         String?
+  createdAt    DateTime   @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@index([tournamentId, userId])
+  @@map("coin_transaction")
+}
+
+model Bounty {
+  id           String           @id @default(cuid())
+  tournamentId String
+  targetType   BountyTargetType
+  // An OPEN bounty (open = true) has no preset target — the first player/team
+  // (per targetType) to complete it wins, and the admin sets `targetId` to the
+  // winner when awarding. A directed bounty carries its target from creation.
+  // A user id (targetType = player) or a team id (targetType = team). Polymorphic,
+  // so no FK relation — the service validates the target against the tournament.
+  open         Boolean          @default(false)
+  targetId     String?
+  description  String
+  coinValue    Int
+  // Free-form win conditions for future auto-detection (D17: admin marks complete for now).
+  conditionMeta Json?
+  active       Boolean          @default(true)
+  awardedAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+
+  @@index([tournamentId])
+  @@map("bounty")
 }

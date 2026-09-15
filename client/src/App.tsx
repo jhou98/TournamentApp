@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { ToastProvider } from "./components/Toast";
 import type { Role } from "./lib/nav";
 import { AppShell } from "./components/layout/AppShell";
 import { Loading } from "./components/ui";
@@ -7,6 +8,8 @@ import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { Home } from "./pages/Home";
 import { Profile } from "./pages/Profile";
+import { Leaderboard } from "./pages/Leaderboard";
+import { Bounties } from "./pages/Bounties";
 import { ComingSoon } from "./pages/ComingSoon";
 import { TournamentHub } from "./pages/tournament/TournamentHub";
 import { Schedule } from "./pages/tournament/Schedule";
@@ -16,6 +19,8 @@ import { Captain } from "./pages/Captain";
 import { AdminHub } from "./pages/admin/AdminHub";
 import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminTeams } from "./pages/admin/AdminTeams";
+import { AdminCoins } from "./pages/admin/AdminCoins";
+import { AdminBounties } from "./pages/admin/AdminBounties";
 import { AdminTournaments } from "./pages/admin/AdminTournaments";
 import { AdminSettings } from "./pages/admin/AdminSettings";
 
@@ -104,12 +109,16 @@ function Shell() {
           <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="teams" element={<AdminTeams />} />
+          <Route path="coins" element={<AdminCoins />} />
+          <Route path="bounties" element={<AdminBounties />} />
           <Route path="tournaments" element={<AdminTournaments />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 
+        <Route path="leaderboard" element={<Leaderboard />} />
+        <Route path="bounties" element={<Bounties />} />
+
         {/* Future phases — placeholders until the features ship (see lib/nav.ts). */}
-        <Route path="leaderboard" element={<ComingSoon />} />
         <Route path="shop" element={<ComingSoon />} />
         <Route path="missions" element={<ComingSoon />} />
 
@@ -127,9 +136,11 @@ function Shell() {
 export function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Shell />
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <Shell />
+        </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

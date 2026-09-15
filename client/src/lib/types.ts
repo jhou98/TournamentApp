@@ -111,7 +111,121 @@ export interface ResultsView {
   matchups: ResultMatchupView[];
 }
 
+/* --- GET /api/me/coins --------------------------------------------------- */
+
+export type CoinReason =
+  | "match_result"
+  | "streak_bonus"
+  | "mission"
+  | "bounty"
+  | "event"
+  | "purchase"
+  | "admin_adjust";
+
+export interface CoinMatchDetail {
+  matchupId: string;
+  stage: Stage | string;
+  roundIndex: number | null;
+  roundNo: number;
+  opponentTeamName: string;
+  scoreFor: number;
+  scoreAgainst: number;
+  won: boolean;
+}
+
+export interface CoinTransactionView {
+  id: string;
+  delta: number;
+  reason: CoinReason;
+  note: string | null;
+  gameId: string | null;
+  createdAt: string;
+  /** Match context for match_result rows; null for other reasons. */
+  match: CoinMatchDetail | null;
+}
+
+export interface CoinSummaryView {
+  balance: number;
+  transactions: CoinTransactionView[];
+}
+
+/* --- GET /api/leaderboard ------------------------------------------------ */
+
+export interface LeaderboardRow {
+  userId: string;
+  displayName: string;
+  teamId: string | null;
+  teamName: string | null;
+  balance: number;
+  rank: number;
+}
+
+export interface LeaderboardView {
+  rows: LeaderboardRow[];
+}
+
+/* --- GET /api/bounties (+ admin CRUD) ------------------------------------ */
+
+export type BountyTargetType = "player" | "team";
+
+export interface BountyView {
+  id: string;
+  targetType: BountyTargetType;
+  /** True for an open bounty (first player/team to complete it wins). */
+  open: boolean;
+  targetId: string | null;
+  /** Player/team name; the winner for an awarded open bounty; null if open & unresolved. */
+  targetName: string | null;
+  description: string;
+  coinValue: number;
+  active: boolean;
+  awardedAt: string | null;
+  createdAt: string;
+}
+
+/* --- GET/PATCH /api/admin/tournament/rules ------------------------------- */
+
+export interface CoinRule {
+  perWin: number;
+  perLoss: number;
+  perCloseLoss?: number;
+  perPointDiff?: number;
+  flatPerGame?: number;
+  floor?: number;
+  closeLossMargin?: number;
+}
+
+export interface StreakTier {
+  after: number;
+  bonus: number;
+}
+
+export interface StreakRule {
+  direction: "loss" | "win" | "both";
+  tiers: StreakTier[];
+}
+
+export interface EconomyRules {
+  coinRule: CoinRule;
+  streakRule: StreakRule;
+}
+
 /* --- helpers ------------------------------------------------------------- */
+
+const COIN_REASON_LABEL: Record<CoinReason, string> = {
+  match_result: "Match result",
+  streak_bonus: "Streak bonus",
+  mission: "Mission",
+  bounty: "Bounty",
+  event: "Event",
+  purchase: "Purchase",
+  admin_adjust: "Admin adjustment",
+};
+
+export function coinReasonLabel(reason: CoinReason): string {
+  return COIN_REASON_LABEL[reason] ?? reason;
+}
+
 
 export function stageLabel(stage: string, roundIndex?: number | null): string {
   if (stage === "semifinal") return "Semifinal";
