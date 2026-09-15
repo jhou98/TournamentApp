@@ -19,7 +19,7 @@ Built as an npm-workspaces monorepo (`server`, `client`) with a ports & adapters
 ## Prerequisites
 
 - Node.js 20 (see `.nvmrc`)
-- Docker Desktop (for local Postgres), **or** a Neon Postgres connection string
+- Docker Desktop (for local Postgres), **or** an Aurora Serverless (Postgres) connection string
 
 ## Setup
 
@@ -29,6 +29,8 @@ Environment lives in the `server/` workspace (that's where Prisma and the server
 npm install
 cp server/.env.example server/.env
 # edit server/.env if not using the default docker-compose Postgres
+# (for the deployed box, point DATABASE_URL/DIRECT_URL at the Aurora Serverless
+#  writer endpoint with ?sslmode=require — see artifact.md §11)
 
 docker compose up -d     # starts local Postgres on :5432
 npm run db:migrate       # applies the Prisma schema
