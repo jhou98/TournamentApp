@@ -36,6 +36,21 @@ export function setActiveTournamentId(id: string | null): void {
   }
 }
 
+// Bridge so this non-React module can raise a toast. The ToastProvider registers
+// its handler on mount; until then messages are simply dropped.
+type ToastTone = "error" | "success" | "info";
+type ToastFn = (message: string, tone?: ToastTone) => void;
+let toastHandler: ToastFn | null = null;
+
+export function registerToastHandler(fn: ToastFn | null): void {
+  toastHandler = fn;
+}
+
+// Set by the server when a request looks like a SQL-injection probe. Prisma makes
+// the payload harmless, so the request still succeeds — this is just a cheeky
+// heads-up we pop as a warning toast.
+const NICE_TRY_HEADER = "X-Nice-Try";
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     credentials: "include",
@@ -46,6 +61,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     },
     ...init,
   });
+
+  const niceTry = res.headers.get(NICE_TRY_HEADER);
+  if (niceTry) toastHandler?.(niceTry, "error");
 
   const body = await res.json().catch(() => null);
 

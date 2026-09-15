@@ -1,5 +1,4 @@
 import type { RequestHandler } from "express";
-import { ValidationError } from "../../../../domain/errors.js";
 import { scanForSqlInjection, sqlInjectionDecoy } from "../../../../domain/security.js";
 
 /**
@@ -38,20 +37,22 @@ export const securityHeaders: RequestHandler = (_req, res, next) => {
   next();
 };
 
+/** Response header carrying the rotating decoy message the client turns into a popup. */
+export const SQL_INJECTION_HEADER = "X-Nice-Try";
+
 /**
- * Reject requests whose body or query string looks like a SQL-injection probe.
- * Prisma already parameterizes every query, so this is a belt-and-suspenders
- * outer wall — and a place to have a little fun: repeat offenders get a rotating
- * decoy message instead of a plain rejection.
+ * Watch requests whose body or query string looks like a SQL-injection probe.
+ * Prisma parameterizes every query, so such a payload can't actually inject —
+ * we let the (sanitized) request through and process it normally, and just have
+ * a little fun: a detection tags the response with a rotating decoy message that
+ * the client surfaces as a popup warning. Repeat probes cycle the message.
  */
 export function makeSqlInjectionGuard(): RequestHandler {
   let detections = 0;
-  return (req, _res, next) => {
+  return (req, res, next) => {
     if (scanForSqlInjection(req.body) || scanForSqlInjection(req.query)) {
-      const message = sqlInjectionDecoy(detections);
+      res.setHeader(SQL_INJECTION_HEADER, sqlInjectionDecoy(detections));
       detections += 1;
-      next(new ValidationError(message));
-      return;
     }
     next();
   };
