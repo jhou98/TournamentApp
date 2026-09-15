@@ -45,6 +45,7 @@ export function createApp(container: Container): Express {
       container.services.results,
       container.services.playoffs,
       container.services.suddenDeath,
+      container.services.economy,
       container.services.tournaments,
       container.authMiddleware,
     ),

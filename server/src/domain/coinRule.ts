@@ -7,6 +7,14 @@
  * the caller (using `closeLossMargin`), not re-derived here.
  */
 
+/**
+ * Largest magnitude a single coin transaction may carry. The `delta` column is
+ * a 32-bit int in the DB (±2.1B); we cap well below that so a manual admin
+ * adjustment can never overflow the column (which would surface as a 500) — and
+ * the ceiling is a sane business limit besides.
+ */
+export const MAX_COIN_ADJUSTMENT = 1_000_000;
+
 /** Pluggable per-player coin-earning rule (D4). */
 export interface CoinRule {
   perWin: number;

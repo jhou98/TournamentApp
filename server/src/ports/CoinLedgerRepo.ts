@@ -41,6 +41,8 @@ export interface CoinBalanceRow {
 
 export interface CoinLedgerRepo {
   createMany(rows: NewCoinTransaction[]): Promise<void>;
+  /** Insert a single ledger row (e.g. a manual admin adjustment) and return it. */
+  create(row: NewCoinTransaction): Promise<CoinTransactionRecord>;
   /** Delete the tournament's DERIVED rows (match_result + streak_bonus) — used by recompute. */
   deleteDerivedByTournament(tournamentId: string): Promise<void>;
   /** A single player's balance = SUM(delta) in the tournament. */

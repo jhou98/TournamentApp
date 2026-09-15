@@ -8,6 +8,8 @@
  * too; there is no filter to round-robin.
  */
 
+import { NotFoundError, ValidationError } from "../domain/errors.js";
+import { MAX_COIN_ADJUSTMENT } from "../domain/coinRule.js";
 import { computeCoinLeaderboard, type LeaderboardRow } from "../domain/coinLeaderboard.js";
 import { computeLedger, type DerivedCoinTxn, type LedgerGameInput } from "../domain/ledger.js";
 import { computeStreakBonuses, type MatchupOutcome, type PlayerOutcomes } from "../domain/streak.js";
@@ -104,6 +106,13 @@ export interface LeaderboardView {
   rows: LeaderboardRow[];
 }
 
+/** The result of a manual admin coin adjustment (US17): the new balance + the row written. */
+export interface CoinAdjustResult {
+  /** The player's tournament balance after the adjustment. */
+  balance: number;
+  transaction: CoinTransactionView;
+}
+
 export interface EconomyService {
   /** Recompute (delete + re-insert) the tournament's derived coin rows from its finalized games. */
   recomputeTournamentLedger(tournamentId: string): Promise<void>;
@@ -111,6 +120,17 @@ export interface EconomyService {
   getCoinSummary(tournamentId: string, userId: string): Promise<CoinSummaryView>;
   /** All players of a tournament ranked by coin balance (players with no coins rank at 0). */
   getLeaderboard(tournamentId: string): Promise<LeaderboardView>;
+  /**
+   * Manually credit or debit a player's coins (US17). Writes an auditable
+   * `admin_adjust` row — never a delete — so it survives ledger recompute and
+   * every change stays in the history. Returns the player's new balance.
+   */
+  adjustCoins(input: {
+    tournamentId: string;
+    userId: string;
+    delta: number;
+    note?: string | null;
+  }): Promise<CoinAdjustResult>;
 }
 
 export function makeEconomyService(deps: EconomyServiceDeps): EconomyService {
@@ -303,6 +323,47 @@ export function makeEconomyService(deps: EconomyServiceDeps): EconomyService {
       }
 
       return { rows: computeCoinLeaderboard(players) };
+    },
+
+    async adjustCoins({ tournamentId, userId, delta, note }) {
+      if (!Number.isInteger(delta) || delta === 0) {
+        throw new ValidationError("Adjustment amount must be a non-zero whole number");
+      }
+      if (Math.abs(delta) > MAX_COIN_ADJUSTMENT) {
+        throw new ValidationError(
+          `Adjustment must be between -${MAX_COIN_ADJUSTMENT} and ${MAX_COIN_ADJUSTMENT} coins`,
+        );
+      }
+
+      // Only players who are in this tournament can be adjusted — coins are
+      // tournament-scoped (D6), so an adjustment must target a member of it.
+      const membership = await deps.memberships.findByUserAndTournament(userId, tournamentId);
+      if (!membership) {
+        throw new NotFoundError("Player is not a member of this tournament");
+      }
+
+      const row = await deps.coinLedger.create({
+        tournamentId,
+        userId,
+        delta,
+        reason: "admin_adjust",
+        note: note?.trim() ? note.trim() : null,
+      });
+
+      const balance = await deps.coinLedger.sumByUser(tournamentId, userId);
+
+      return {
+        balance,
+        transaction: {
+          id: row.id,
+          delta: row.delta,
+          reason: row.reason,
+          note: row.note,
+          gameId: row.gameId,
+          createdAt: row.createdAt.toISOString(),
+          match: null,
+        },
+      };
     },
   };
 }

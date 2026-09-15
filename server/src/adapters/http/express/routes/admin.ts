@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { ValidationError } from "../../../../domain/errors.js";
+import { MAX_COIN_ADJUSTMENT } from "../../../../domain/coinRule.js";
 import type { RosterService } from "../../../../services/rosterService.js";
 import type { ScheduleService } from "../../../../services/scheduleService.js";
 import type { ResultsService } from "../../../../services/resultsService.js";
 import type { PlayoffsService } from "../../../../services/playoffsService.js";
 import type { SuddenDeathService } from "../../../../services/suddenDeathService.js";
+import type { EconomyService } from "../../../../services/economyService.js";
 import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { makeResolveTournament } from "../middleware/tournament.js";
@@ -71,6 +73,17 @@ const suddenDeathResultSchema = z.object({
   scoreA: z.number().int().nonnegative(),
   scoreB: z.number().int().nonnegative(),
 });
+const adjustCoinsSchema = z.object({
+  userId: z.string().min(1),
+  delta: z
+    .number()
+    .int("Adjustment amount must be a whole number")
+    .refine((n) => n !== 0, { message: "Adjustment amount must be non-zero" })
+    .refine((n) => Math.abs(n) <= MAX_COIN_ADJUSTMENT, {
+      message: `Adjustment must be between -${MAX_COIN_ADJUSTMENT} and ${MAX_COIN_ADJUSTMENT} coins`,
+    }),
+  note: z.string().trim().max(200).optional(),
+});
 // A game edit may enter/edit a score, reassign a court, or both (US9 + Part 2).
 const editGameSchema = z
   .object({
@@ -91,6 +104,7 @@ export function adminRouter(
   results: ResultsService,
   playoffs: PlayoffsService,
   suddenDeath: SuddenDeathService,
+  economy: EconomyService,
   tournaments: TournamentService,
   mw: AuthMiddleware,
 ): Router {
@@ -294,6 +308,16 @@ export function adminRouter(
       });
       await playoffs.sync(req.tournamentId!);
       res.status(204).end();
+    }),
+  );
+
+  // --- Economy (US17: manual coin adjust / reverse) ------------------------
+
+  router.post(
+    "/coins/adjust",
+    asyncHandler(async (req, res) => {
+      const { userId, delta, note } = parse(adjustCoinsSchema, req.body);
+      res.status(201).json(await economy.adjustCoins({ tournamentId: req.tournamentId!, userId, delta, note }));
     }),
   );
 

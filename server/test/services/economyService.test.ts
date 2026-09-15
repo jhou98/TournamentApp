@@ -53,6 +53,8 @@ interface Stores {
   lineups: LineupWithPairs[];
   matchups: MatchupRecord[];
   createdRows: NewCoinTransaction[][];
+  /** Single-row inserts (admin adjustments). */
+  createdSingles: CoinTransactionRecord[];
   deletedFor: string[];
   /** Pre-seeded ledger reads keyed by `${tournamentId}:${userId}`. */
   ledgerByUser: Record<string, CoinTransactionRecord[]>;
@@ -140,6 +142,7 @@ function freshStores(): Stores {
     lineups,
     matchups,
     createdRows: [],
+    createdSingles: [],
     deletedFor: [],
     ledgerByUser: {},
     memberships: [],
@@ -256,6 +259,26 @@ function buildService(stores: Stores): EconomyService {
     async createMany(rows) {
       stores.createdRows.push(rows);
     },
+    async create(row) {
+      const record: CoinTransactionRecord = {
+        id: `adj-${stores.createdSingles.length + 1}`,
+        tournamentId: row.tournamentId,
+        userId: row.userId,
+        delta: row.delta,
+        reason: row.reason,
+        gameId: row.gameId ?? null,
+        bountyId: row.bountyId ?? null,
+        missionId: row.missionId ?? null,
+        purchaseId: row.purchaseId ?? null,
+        note: row.note ?? null,
+        createdAt: new Date("2026-02-01T00:00:00.000Z"),
+      };
+      stores.createdSingles.push(record);
+      // Reflect the insert in subsequent balance/history reads.
+      const key = `${row.tournamentId}:${row.userId}`;
+      stores.ledgerByUser[key] = [record, ...(stores.ledgerByUser[key] ?? [])];
+      return record;
+    },
     async deleteDerivedByTournament(tournamentId) {
       stores.deletedFor.push(tournamentId);
     },
@@ -272,8 +295,10 @@ function buildService(stores: Stores): EconomyService {
   };
 
   const memberships = {
-    async findByUserAndTournament() {
-      return null;
+    async findByUserAndTournament(userId: string, tournamentId: string) {
+      return (
+        stores.memberships.find((m) => m.userId === userId && m.tournamentId === tournamentId) ?? null
+      );
     },
     async listByUser() {
       return [];
@@ -615,5 +640,81 @@ describe("economyService.getLeaderboard", () => {
     expect(rows.every((r) => r.balance === 0)).toBe(true);
     // All tied at 0 -> all rank 1.
     expect(rows.every((r) => r.rank === 1)).toBe(true);
+  });
+});
+
+describe("economyService.adjustCoins", () => {
+  let stores: Stores;
+  let service: EconomyService;
+
+  function member(userId: string, teamId: string): MembershipRecord {
+    return { id: `m-${userId}`, userId, teamId, tournamentId: TID, role: "member", createdAt: new Date() };
+  }
+
+  beforeEach(() => {
+    stores = freshStores();
+    stores.memberships = [member("a1", TA)];
+    service = buildService(stores);
+  });
+
+  it("writes an auditable admin_adjust row and returns the new balance", async () => {
+    stores.ledgerByUser[`${TID}:a1`] = []; // starts at 0
+
+    const result = await service.adjustCoins({ tournamentId: TID, userId: "a1", delta: 50, note: " bonus " });
+
+    expect(stores.createdSingles).toHaveLength(1);
+    const row = stores.createdSingles[0]!;
+    expect(row).toMatchObject({ tournamentId: TID, userId: "a1", delta: 50, reason: "admin_adjust", note: "bonus", gameId: null });
+    expect(result.balance).toBe(50);
+    expect(result.transaction).toMatchObject({ delta: 50, reason: "admin_adjust", note: "bonus", match: null });
+    expect(result.transaction.createdAt).toBe("2026-02-01T00:00:00.000Z");
+  });
+
+  it("supports negative deltas (reversals) and sums against existing rows", async () => {
+    stores.ledgerByUser[`${TID}:a1`] = [
+      {
+        id: "seed",
+        tournamentId: TID,
+        userId: "a1",
+        delta: 100,
+        reason: "match_result",
+        gameId: null,
+        bountyId: null,
+        missionId: null,
+        purchaseId: null,
+        note: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ];
+
+    const result = await service.adjustCoins({ tournamentId: TID, userId: "a1", delta: -30 });
+    expect(result.balance).toBe(70);
+    expect(stores.createdSingles[0]!.note).toBeNull();
+  });
+
+  it("rejects a zero or non-integer delta without writing a row", async () => {
+    await expect(service.adjustCoins({ tournamentId: TID, userId: "a1", delta: 0 })).rejects.toThrow();
+    await expect(service.adjustCoins({ tournamentId: TID, userId: "a1", delta: 1.5 })).rejects.toThrow();
+    expect(stores.createdSingles).toHaveLength(0);
+  });
+
+  it("rejects a delta beyond the max magnitude (no int overflow reaches the DB)", async () => {
+    await expect(
+      service.adjustCoins({ tournamentId: TID, userId: "a1", delta: 5_000_000_000 }),
+    ).rejects.toThrow(/between/);
+    await expect(
+      service.adjustCoins({ tournamentId: TID, userId: "a1", delta: -5_000_000_000 }),
+    ).rejects.toThrow(/between/);
+    expect(stores.createdSingles).toHaveLength(0);
+  });
+
+  it("rejects adjusting a player who is not a member of the tournament", async () => {
+    await expect(service.adjustCoins({ tournamentId: TID, userId: "stranger", delta: 10 })).rejects.toThrow();
+    expect(stores.createdSingles).toHaveLength(0);
+  });
+
+  it("does not use the derived-row delete path (adjustments survive recompute)", async () => {
+    await service.adjustCoins({ tournamentId: TID, userId: "a1", delta: 10 });
+    expect(stores.deletedFor).toHaveLength(0);
   });
 });

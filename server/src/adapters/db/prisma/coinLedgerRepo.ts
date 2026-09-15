@@ -20,6 +20,9 @@ export function makePrismaCoinLedgerRepo(): CoinLedgerRepo {
     async createMany(rows) {
       await getDb().coinTransaction.createMany({ data: rows });
     },
+    async create(row) {
+      return getDb().coinTransaction.create({ data: row, select: RECORD_SELECT });
+    },
     async deleteDerivedByTournament(tournamentId) {
       await getDb().coinTransaction.deleteMany({
         where: { tournamentId, reason: { in: ["match_result", "streak_bonus"] } },

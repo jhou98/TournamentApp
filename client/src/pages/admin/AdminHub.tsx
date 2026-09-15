@@ -10,6 +10,7 @@ export function AdminHub() {
         tabs={[
           { to: "/admin/users", label: "Users" },
           { to: "/admin/teams", label: "Teams" },
+          { to: "/admin/coins", label: "Coins" },
           { to: "/admin/tournaments", label: "Tournaments" },
           { to: "/admin/settings", label: "Settings" },
         ]}

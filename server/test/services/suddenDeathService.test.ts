@@ -266,6 +266,9 @@ function buildService(stores: Stores): SuddenDeathService {
     async getLeaderboard() {
       return { rows: [] };
     },
+    async adjustCoins() {
+      throw new Error("not used");
+    },
   };
 
   return makeSuddenDeathService({
