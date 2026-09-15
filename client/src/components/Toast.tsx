@@ -1,4 +1,14 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { registerToastHandler } from "../lib/api";
 import { Icon } from "./Icon";
 import { cx } from "./ui";
 
@@ -48,6 +58,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   const api = useMemo(() => ({ showToast }), [showToast]);
+
+  // Let the API layer (a non-React module) raise toasts, e.g. the SQL-injection
+  // "nice try" heads-up carried on a response header.
+  useEffect(() => {
+    registerToastHandler(showToast);
+    return () => registerToastHandler(null);
+  }, [showToast]);
 
   return (
     <ToastContext.Provider value={api}>

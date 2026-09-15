@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { z } from "zod";
-import { ValidationError } from "../../../../domain/errors.js";
 import { MAX_COIN_ADJUSTMENT } from "../../../../domain/coinRule.js";
 import type { RosterService } from "../../../../services/rosterService.js";
 import type { ScheduleService } from "../../../../services/scheduleService.js";
@@ -13,22 +12,15 @@ import type { TournamentService } from "../../../../services/tournamentService.j
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { makeResolveTournament } from "../middleware/tournament.js";
 import { asyncHandler } from "../asyncHandler.js";
+import { parse, safeText } from "../validation.js";
 import { requireParam } from "../params.js";
-
-function parse<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
-  const result = schema.safeParse(body);
-  if (!result.success) {
-    throw new ValidationError(result.error.issues.map((i) => i.message).join("; "));
-  }
-  return result.data;
-}
 
 const setAdminSchema = z.object({ isAdmin: z.boolean() });
 const inviteSchema = z.object({
   grantsAdmin: z.boolean().default(false),
   expiresAt: z.coerce.date().optional(),
 });
-const createTeamSchema = z.object({ name: z.string().trim().min(1).max(60) });
+const createTeamSchema = z.object({ name: safeText({ min: 1, max: 60 }) });
 const assignMemberSchema = z.object({
   userId: z.string().min(1),
   role: z.enum(["captain", "member"]).optional(),
@@ -37,7 +29,7 @@ const setCaptainSchema = z.object({ userId: z.string().min(1) });
 
 const positiveInt = z.number().int().positive();
 const createTournamentSchema = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: safeText({ min: 1, max: 80 }),
   config: z
     .object({
       teamCount: positiveInt,
@@ -69,7 +61,7 @@ const editMatchupSchema = z.object({
   teamAId: z.string().min(1),
   teamBId: z.string().min(1),
 });
-const renameCourtSchema = z.object({ label: z.string().trim().min(1).max(60) });
+const renameCourtSchema = z.object({ label: safeText({ min: 1, max: 60 }) });
 const suddenDeathResultSchema = z.object({
   scoreA: z.number().int().nonnegative(),
   scoreB: z.number().int().nonnegative(),
@@ -83,17 +75,17 @@ const adjustCoinsSchema = z.object({
     .refine((n) => Math.abs(n) <= MAX_COIN_ADJUSTMENT, {
       message: `Adjustment must be between -${MAX_COIN_ADJUSTMENT} and ${MAX_COIN_ADJUSTMENT} coins`,
     }),
-  note: z.string().trim().max(200).optional(),
+  note: safeText({ min: 0, max: 200 }).optional(),
 });
 const createBountySchema = z.object({
   targetType: z.enum(["player", "team"]),
   // Omit targetId for an OPEN bounty (first player/team to complete it wins).
   targetId: z.string().min(1).optional(),
-  description: z.string().trim().min(1).max(200),
+  description: safeText({ min: 1, max: 200 }),
   coinValue: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
 });
 const awardBountySchema = z.object({ winnerId: z.string().min(1).optional() });
-const resetCoinsSchema = z.object({ note: z.string().trim().max(200).optional() });
+const resetCoinsSchema = z.object({ note: safeText({ min: 0, max: 200 }).optional() });
 
 // Coin values feed per-game/streak ledger rows (a 32-bit int column) — bound
 // them to the same per-transaction cap so a rule can't overflow the ledger.
