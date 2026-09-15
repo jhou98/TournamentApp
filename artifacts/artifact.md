@@ -212,6 +212,8 @@ random matchups → results → standings → playoffs, not the UI). **P1 = econ
 | US25 | **Live tournament dashboard** (standings, current round/courts/scores, coin leaderboard, active bounties, active events) that updates as results are entered |
 | US26 | **Captain dashboard** (team, upcoming matchup + lineup/submission status, team history, strategic resources) |
 | US27 | Tournament **history / activity log** view, animations, and a **mobile-friendly** interface |
+| US29 | Security Setup - App should automatically clean and parse any attempts at SQL injection |
+| US30 | Traffic Protection - App should implement basic rate limiting and firewall to filter out malicious traffic |
 
 > **Removed vs. prior artifact:** sub-team hierarchy, **team** coin wallets (coins
 > are now per-player), Excel import, and **open-join / self-serve invites** (admin assigns
