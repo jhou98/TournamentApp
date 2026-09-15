@@ -149,6 +149,21 @@ export interface CoinSummaryView {
   transactions: CoinTransactionView[];
 }
 
+/* --- GET /api/leaderboard ------------------------------------------------ */
+
+export interface LeaderboardRow {
+  userId: string;
+  displayName: string;
+  teamId: string | null;
+  teamName: string | null;
+  balance: number;
+  rank: number;
+}
+
+export interface LeaderboardView {
+  rows: LeaderboardRow[];
+}
+
 /* --- helpers ------------------------------------------------------------- */
 
 const COIN_REASON_LABEL: Record<CoinReason, string> = {

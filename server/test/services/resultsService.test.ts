@@ -319,6 +319,9 @@ function buildService(stores: Stores): ResultsService {
     async getCoinSummary() {
       return { balance: 0, transactions: [] };
     },
+    async getLeaderboard() {
+      return { rows: [] };
+    },
   };
 
   return makeResultsService({

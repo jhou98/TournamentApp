@@ -8,6 +8,7 @@
  * too; there is no filter to round-robin.
  */
 
+import { computeCoinLeaderboard, type LeaderboardRow } from "../domain/coinLeaderboard.js";
 import { computeLedger, type DerivedCoinTxn, type LedgerGameInput } from "../domain/ledger.js";
 import { computeStreakBonuses, type MatchupOutcome, type PlayerOutcomes } from "../domain/streak.js";
 import type {
@@ -18,8 +19,11 @@ import type {
   LineupWithPairs,
   MatchupRepo,
   MatchupView,
+  MembershipRepo,
+  TeamRepo,
   TournamentRepo,
   UnitOfWork,
+  UserRepo,
 } from "../ports/index.js";
 
 export interface EconomyServiceDeps {
@@ -27,6 +31,9 @@ export interface EconomyServiceDeps {
   games: GameRepo;
   lineups: LineupRepo;
   matchups: MatchupRepo;
+  memberships: MembershipRepo;
+  users: UserRepo;
+  teams: TeamRepo;
   coinLedger: CoinLedgerRepo;
   uow: UnitOfWork;
 }
@@ -92,11 +99,18 @@ export interface CoinSummaryView {
   transactions: CoinTransactionView[];
 }
 
+/** Every player of a tournament, ranked by coin balance (US17). */
+export interface LeaderboardView {
+  rows: LeaderboardRow[];
+}
+
 export interface EconomyService {
   /** Recompute (delete + re-insert) the tournament's derived coin rows from its finalized games. */
   recomputeTournamentLedger(tournamentId: string): Promise<void>;
   /** One player's coin balance + transaction history for a tournament (newest first). */
   getCoinSummary(tournamentId: string, userId: string): Promise<CoinSummaryView>;
+  /** All players of a tournament ranked by coin balance (players with no coins rank at 0). */
+  getLeaderboard(tournamentId: string): Promise<LeaderboardView>;
 }
 
 export function makeEconomyService(deps: EconomyServiceDeps): EconomyService {
@@ -261,6 +275,34 @@ export function makeEconomyService(deps: EconomyServiceDeps): EconomyService {
           match: r.reason === "match_result" && r.gameId ? (matchByGame.get(r.gameId) ?? null) : null,
         })),
       };
+    },
+
+    async getLeaderboard(tournamentId) {
+      // The roster comes from memberships (the definitive list of who's in the
+      // tournament), so players who haven't earned yet still appear at 0 — coins
+      // start at 0 per tournament and never carry over (D6).
+      const [balances, memberships, teams] = await Promise.all([
+        deps.coinLedger.sumByTournamentGroupedByUser(tournamentId),
+        deps.memberships.listByTournament(tournamentId),
+        deps.teams.listByTournament(tournamentId),
+      ]);
+      const balanceByUser = new Map(balances.map((b) => [b.userId, b.balance]));
+      const teamNameById = new Map(teams.map((t) => [t.id, t.name]));
+
+      const players = [];
+      for (const m of memberships) {
+        const user = await deps.users.findById(m.userId);
+        if (!user) continue;
+        players.push({
+          userId: user.id,
+          displayName: user.displayName,
+          teamId: m.teamId,
+          teamName: teamNameById.get(m.teamId) ?? null,
+          balance: balanceByUser.get(user.id) ?? 0,
+        });
+      }
+
+      return { rows: computeCoinLeaderboard(players) };
     },
   };
 }

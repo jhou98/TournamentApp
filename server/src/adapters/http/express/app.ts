@@ -12,6 +12,7 @@ import { adminRouter } from "./routes/admin.js";
 import { scheduleRouter } from "./routes/schedule.js";
 import { matchupsRouter } from "./routes/matchups.js";
 import { resultsRouter } from "./routes/results.js";
+import { leaderboardRouter } from "./routes/leaderboard.js";
 import { tournamentsRouter } from "./routes/tournaments.js";
 
 export function createApp(container: Container): Express {
@@ -62,6 +63,10 @@ export function createApp(container: Container): Express {
     ),
   );
   api.use(resultsRouter(container.services.results, container.services.tournaments, container.authMiddleware));
+  api.use(
+    "/leaderboard",
+    leaderboardRouter(container.services.economy, container.services.tournaments, container.authMiddleware),
+  );
   app.use("/api", api);
 
   // Serve the built SPA in production, with history fallback for client routes.

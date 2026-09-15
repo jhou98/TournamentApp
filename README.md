@@ -52,3 +52,6 @@ npm run test
 npm run build
 npm run db:studio        # Prisma Studio
 ```
+
+## Prod Setup
+- Amazon sign-in: https://293532442953.signin.aws.amazon.com/console

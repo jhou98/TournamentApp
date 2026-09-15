@@ -263,6 +263,9 @@ function buildService(stores: Stores): SuddenDeathService {
     async getCoinSummary() {
       return { balance: 0, transactions: [] };
     },
+    async getLeaderboard() {
+      return { rows: [] };
+    },
   };
 
   return makeSuddenDeathService({

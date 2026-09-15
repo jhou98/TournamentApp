@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { makeEconomyService, type EconomyService } from "../../src/services/economyService.js";
 import { DEFAULT_COIN_RULE, DEFAULT_STREAK_RULE } from "../../src/domain/tournamentDefaults.js";
 import type {
+  CoinBalanceRow,
   CoinLedgerRepo,
   CoinTransactionRecord,
   GameRecord,
@@ -10,10 +11,16 @@ import type {
   LineupWithPairs,
   MatchupRecord,
   MatchupRepo,
+  MembershipRecord,
+  MembershipRepo,
   NewCoinTransaction,
+  TeamRecord,
+  TeamRepo,
   TournamentDetail,
   TournamentRepo,
   UnitOfWork,
+  UserRecord,
+  UserRepo,
 } from "../../src/ports/index.js";
 
 const TID = "t1";
@@ -49,6 +56,11 @@ interface Stores {
   deletedFor: string[];
   /** Pre-seeded ledger reads keyed by `${tournamentId}:${userId}`. */
   ledgerByUser: Record<string, CoinTransactionRecord[]>;
+  /** Leaderboard fixtures. */
+  memberships: MembershipRecord[];
+  teams: TeamRecord[];
+  users: UserRecord[];
+  balances: CoinBalanceRow[];
 }
 
 function freshStores(): Stores {
@@ -122,7 +134,19 @@ function freshStores(): Stores {
     },
   ];
 
-  return { tournament: detail(), games, lineups, matchups, createdRows: [], deletedFor: [], ledgerByUser: {} };
+  return {
+    tournament: detail(),
+    games,
+    lineups,
+    matchups,
+    createdRows: [],
+    deletedFor: [],
+    ledgerByUser: {},
+    memberships: [],
+    teams: [],
+    users: [],
+    balances: [],
+  };
 }
 
 function buildService(stores: Stores): EconomyService {
@@ -243,11 +267,81 @@ function buildService(stores: Stores): EconomyService {
       return (stores.ledgerByUser[`${tournamentId}:${userId}`] ?? []).map((r) => ({ ...r }));
     },
     async sumByTournamentGroupedByUser() {
-      return [];
+      return stores.balances.map((b) => ({ ...b }));
     },
   };
 
-  return makeEconomyService({ tournaments, games, lineups, matchups, coinLedger, uow: passthroughUow });
+  const memberships = {
+    async findByUserAndTournament() {
+      return null;
+    },
+    async listByUser() {
+      return [];
+    },
+    async listByTeam() {
+      return [];
+    },
+    async listByTournament() {
+      return stores.memberships.map((m) => ({ ...m }));
+    },
+    async assign() {
+      throw new Error("not used");
+    },
+    async setRole() {
+      throw new Error("not used");
+    },
+    async removeByUserAndTournament() {
+      throw new Error("not used");
+    },
+  } satisfies MembershipRepo;
+
+  const users = {
+    async create() {
+      throw new Error("not used");
+    },
+    async findById(id: string) {
+      return stores.users.find((u) => u.id === id) ?? null;
+    },
+    async findByUsername() {
+      return null;
+    },
+    async list() {
+      throw new Error("not used");
+    },
+    async setAdmin() {
+      throw new Error("not used");
+    },
+  } satisfies UserRepo;
+
+  const teams = {
+    async create() {
+      throw new Error("not used");
+    },
+    async findById() {
+      return null;
+    },
+    async findByName() {
+      return null;
+    },
+    async listByTournament() {
+      return stores.teams.map((t) => ({ ...t }));
+    },
+    async delete() {
+      throw new Error("not used");
+    },
+  } satisfies TeamRepo;
+
+  return makeEconomyService({
+    tournaments,
+    games,
+    lineups,
+    matchups,
+    memberships,
+    users,
+    teams,
+    coinLedger,
+    uow: passthroughUow,
+  });
 }
 
 describe("economyService.recomputeTournamentLedger", () => {
@@ -473,5 +567,53 @@ describe("economyService.getCoinSummary", () => {
 
     const summary = await service.getCoinSummary(TID, "a1");
     expect(summary.balance).toBe(100);
+  });
+});
+
+describe("economyService.getLeaderboard", () => {
+  let stores: Stores;
+  let service: EconomyService;
+
+  function member(userId: string, teamId: string): MembershipRecord {
+    return { id: `m-${userId}`, userId, teamId, tournamentId: TID, role: "member", createdAt: new Date() };
+  }
+  function userRec(id: string, displayName: string): UserRecord {
+    return { id, username: id, displayName, passwordHash: "x", isAdmin: false, createdAt: new Date() };
+  }
+
+  beforeEach(() => {
+    stores = freshStores();
+    stores.teams = [
+      { id: TA, tournamentId: TID, name: "Alpha", createdAt: new Date() },
+      { id: TB, tournamentId: TID, name: "Bravo", createdAt: new Date() },
+    ];
+    stores.memberships = [member("a1", TA), member("a2", TA), member("b1", TB)];
+    stores.users = [userRec("a1", "Ann"), userRec("a2", "Abe"), userRec("b1", "Bo")];
+    service = buildService(stores);
+  });
+
+  it("ranks every member by balance and joins name + team", async () => {
+    stores.balances = [
+      { userId: "a1", balance: 100 },
+      { userId: "b1", balance: 250 },
+      // a2 has no ledger rows -> not in balances -> should default to 0.
+    ];
+
+    const { rows } = await service.getLeaderboard(TID);
+
+    expect(rows.map((r) => [r.displayName, r.teamName, r.balance, r.rank])).toEqual([
+      ["Bo", "Bravo", 250, 1],
+      ["Ann", "Alpha", 100, 2],
+      ["Abe", "Alpha", 0, 3],
+    ]);
+  });
+
+  it("includes members with no coins at a zero balance (start-at-0 per tournament)", async () => {
+    stores.balances = []; // nobody has earned yet
+    const { rows } = await service.getLeaderboard(TID);
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r) => r.balance === 0)).toBe(true);
+    // All tied at 0 -> all rank 1.
+    expect(rows.every((r) => r.rank === 1)).toBe(true);
   });
 });

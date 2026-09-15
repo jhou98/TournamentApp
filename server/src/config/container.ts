@@ -115,6 +115,9 @@ export function buildContainer(env: Env): Container {
     games: gamesRepo,
     lineups,
     matchups,
+    memberships,
+    users,
+    teams,
     coinLedger,
     uow: unitOfWork,
   });

@@ -7,6 +7,7 @@ import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { Home } from "./pages/Home";
 import { Profile } from "./pages/Profile";
+import { Leaderboard } from "./pages/Leaderboard";
 import { ComingSoon } from "./pages/ComingSoon";
 import { TournamentHub } from "./pages/tournament/TournamentHub";
 import { Schedule } from "./pages/tournament/Schedule";
@@ -108,8 +109,9 @@ function Shell() {
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 
+        <Route path="leaderboard" element={<Leaderboard />} />
+
         {/* Future phases — placeholders until the features ship (see lib/nav.ts). */}
-        <Route path="leaderboard" element={<ComingSoon />} />
         <Route path="shop" element={<ComingSoon />} />
         <Route path="missions" element={<ComingSoon />} />
 
