@@ -9,9 +9,7 @@ phases layer on a per-player coin economy, a power-up shop, and commissioner too
 See [artifacts/artifact.md](./artifacts/artifact.md) for the full design doc — the
 original design intent that seeded the build (data model, flows, and the architecture
 rules the server still follows). It captures initial design and may drift from the code
-over time; where they disagree, the code is authoritative. The
-[original user stories](./artifacts/Friendsgiving%20Badminton%20Tournament%20%E2%80%94%20Vibe%20Coding%20User%20Stories.md)
-are also preserved there.
+over time; where they disagree, the code is authoritative.
 
 Built as an npm-workspaces monorepo (`server`, `client`) with a ports & adapters
 (hexagonal) server core — see §11 of the design doc for the architecture rules.
