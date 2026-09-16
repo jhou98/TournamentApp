@@ -16,12 +16,6 @@ export const environments: Record<string, EnvironmentConfig> = {
     dbBackupRetentionDays: 7,
     ec2InstanceSize: ec2.InstanceSize.NANO,
   },
-  staging: {
-    appPort: 4000,
-    dbAllocatedStorageGb: 20,
-    dbBackupRetentionDays: 7,
-    ec2InstanceSize: ec2.InstanceSize.NANO,
-  },
   prod: {
     appPort: 4000,
     dbAllocatedStorageGb: 20,
