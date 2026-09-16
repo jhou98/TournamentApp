@@ -63,14 +63,14 @@ defined as an **AWS CDK** app under [`infra/`](./infra/README.md), and CI/CD liv
 
 - **`pr.yml`** — on every pull request: build + lint + unit tests, and `cdk synth` + `cfn-lint`
   validation of the CloudFormation templates.
-- **`deploy.yml`** — a manual "Deploy to AWS" action: pick an environment (`prod`/`staging`/`dev`) and
+- **`deploy.yml`** — a manual "Deploy to AWS" action: pick an environment (`prod`/`dev`) and
   a branch/tag; it runs those same checks, then provisions/updates that environment's CDK stack and
   publishes the chosen branch onto its EC2 box (via SSM). AWS access uses GitHub OIDC — no long-lived
   keys, with per-environment config held in GitHub Environments.
 
-See [`infra/README.md`](./infra/README.md) for the environment model, one-time bootstrap steps, and
+See [`infra/README.md`](./infra/README.md) for the environment model, one-time bootstrap steps (already setup for prod and dev), and
 required variables/secrets. Caddy/HTTPS is a planned follow-up — for now the app is served directly
 over the Elastic IP on the app port.
 
 ## Prod Setup
-- Amazon sign-in: https://293532442953.signin.aws.amazon.com/console
+- Amazon sign-in url: https://293532442953.signin.aws.amazon.com/console. Reach out to Jack for IAM user password. 
