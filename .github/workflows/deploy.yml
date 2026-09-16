@@ -96,8 +96,8 @@ jobs:
           SHA=$(git rev-parse HEAD)
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           tar -czf "$RUNNER_TEMP/release.tar.gz" \
-            package.json package-lock.json \
-            server/dist server/package.json server/prisma \
+            package.json package-lock.json tsconfig.base.json \
+            server/dist server/package.json server/prisma server/src server/tsconfig.json \
             client/package.json client/dist \
             infra/scripts
           echo "Packaged release $SHA"
