@@ -1,11 +1,10 @@
 # Friendsgiving Badminton Tournament — Design
 
 > **Status:** Living design doc — captures intent, not a running log; see git history
-> for how it evolved. **Phase 0 (tournament engine) is complete**: auth/roles (US1–US3),
-> round-robin schedule + courts (US4–US5), captain lineups + random pairing (US6–US8),
-> scoring + standings (US9–US10), playoffs + sudden death (US11–US12), and
-> multi-tournament access (US28, minus the coin-reset piece deferred to Phase 1). Next
-> up: **Phase 1 (economy)**. Owner: @jhou98. Last updated: 2026-09-16.
+> for how it evolved. **Phase 1 (economy) is complete**. Additionally, basic workflows 
+> have been setup includin PR checks and Deploy actions and AWS infrastructure along with it.
+> Additionally, US29 has been fully addressed and US30 partially.
+> Next up: **Phase 2: Power ups + Commissioner**. Owner: @jhou98. Last updated: 2026-09-16.
 >
 > **Configurable, not hardcoded:** the reference tournament is 24 players / 4 teams
 > of 6 / 3 round-robin rounds, but team count, team size, pair size, pairs per
