@@ -4,3 +4,4 @@ cdk.out/
 *.d.ts
 !jest.config.js
 .cdk.staging/
+cdk.context.json

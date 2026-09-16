@@ -16,7 +16,7 @@ if (!/^[a-z0-9-]+$/.test(environment)) {
   throw new Error(`Invalid env '${environment}' — use lowercase letters, digits and dashes (e.g. prod, staging, dev).`);
 }
 
-const { appPort } = configFor(environment);
+const { appPort, dbAllocatedStorageGb, dbBackupRetentionDays, ec2InstanceSize } = configFor(environment);
 
 // Environment-agnostic by default so `cdk synth` needs no AWS credentials in CI.
 // At deploy time CDK resolves the account/region from the assumed role.
@@ -43,6 +43,9 @@ new InfrastructureStack(app, "TournamentAppInfra", {
   appName,
   environment,
   appPort,
+  dbAllocatedStorageGb,
+  dbBackupRetentionDays,
+  ec2InstanceSize,
   description: `TournamentApp infrastructure (${environment}): EC2 (public, EIP) + private RDS Postgres.`,
 });
 
