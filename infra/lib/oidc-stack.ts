@@ -42,7 +42,12 @@ export class OidcStack extends cdk.Stack {
           clientIds: ["sts.amazonaws.com"],
         });
 
-    const subject = `repo:${props.githubOrg}/${props.githubRepo}:*`;
+    // GitHub's `sub` claim comes in two shapes — the classic `repo:ORG/REPO:...`
+    // and the ID-qualified `repo:ORG@<ownerId>/REPO@<repoId>:...` — so accept both.
+    const subjects = [
+      `repo:${props.githubOrg}/${props.githubRepo}:*`,
+      `repo:${props.githubOrg}@*/${props.githubRepo}@*:*`,
+    ];
 
     const prefix = `${props.appName}-${props.environment}`;
 
@@ -57,7 +62,7 @@ export class OidcStack extends cdk.Stack {
         // Any branch/tag/environment of this repo. Tighten later if desired, e.g.
         //   `repo:ORG/REPO:environment:production`
         StringLike: {
-          "token.actions.githubusercontent.com:sub": subject,
+          "token.actions.githubusercontent.com:sub": subjects,
         },
       }),
     });
