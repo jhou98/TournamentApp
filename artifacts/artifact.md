@@ -1,133 +1,11 @@
 # Friendsgiving Badminton Tournament — Design
 
-> **Status:** Living design doc. **Implementation in progress** — Phase 0 Part 0
-> (foundation + health), Part 1 (auth, roster, captains — US1–US3), Part 2
-> (round-robin schedule generation + court assignment — US4–US5), Part 3
-> (captain lineups, validation, random pair assignment — US6–US8), Part 4
-> (match scoring + standings/seeding — US9–US10), Part 5 (playoffs, sudden
-> death — US11–US12), and Part 6 (multi-tournament + per-tournament access —
-> **US28**, minus the coin-reset piece deferred with the rest of the economy)
-> have landed. **Phase 0 is complete.** Next up: Phase 1 (economy). Owner:
-> @jhou98. Last updated: 2026-09-14.
->
-> **Changelog (2026-09-14) — no ties (reverses D19):** round-robin draws are gone.
-> A round-robin matchup with a level game tally now behaves exactly like a tied
-> playoff matchup: it stays `in_progress` and goes to **sudden death** (same
-> rep-pick + 1v1 flow, same `sudden_death_rule`) — the winner is credited the
-> round-robin win. `isTiedPlayoff` (sudden-death service) is renamed
-> `isTiedMatchup` and no longer gates on stage. **Standings** drop **points**
-> and the tie column entirely: `MATCHUP_POINTS`/`StandingRow.points`/
-> `matchupsTied` are removed, and ranking is now **matchups won → game
-> differential → point differential → team name** (equivalent to the old
-> points sort once ties can't happen). UI shows **W-L** (no `-T`). **Admin edit:**
-> `POST /api/admin/matchups/:id/sudden-death` no longer rejects a resubmit —
-> an admin can correct a wrong sudden-death score/rep-side after the matchup
-> already finalized (mirrors the existing re-editable `PATCH /api/admin/games/:id`).
-> The `Overtime` component (Results + Captain Panel) now shows the score form
-> alongside a recorded result, pre-filled, so admins can edit in place; its UI
-> label changes from **"Overtime"** to **"Sudden death"** for both stages (the
-> round-robin-only **"Tie"** pill is gone — a tied round-robin matchup now shows
-> the same **"Sudden death"** pill as a tied playoff matchup). **Results:** the
-> per-game score button always reads **"Save"** (was "Edit" once a score existed).
->
-> **Changelog (2026-09-13) — UI refresh:** the client was rebuilt on the warm
-> "Friendsgiving" look from `artifacts/example-design-25.png`: **Tailwind v4** (tokens in
-> `client/src/index.css` via `@theme`; shared primitives in `client/src/components/ui.tsx`),
-> a dark **sidebar shell** (`components/layout/AppShell.tsx`, collapses to a drawer on
-> mobile), and a new information architecture — **Home** dashboard at `/` (live banner,
-> stats, recent results, my team, standings snapshot), **Tournament Tracker** at
-> `/tournament/{schedule,results,standings}` (tabbed), **Captain Panel** at `/captain`
-> (was Lineups), **Admin Panel** at `/admin/{users,teams,tournaments,settings}` (tabbed),
-> **Profile** at `/profile`, and a split-hero **Login/Signup**. Old flat routes redirect.
-> **Future phases are wired in already:** `client/src/lib/nav.ts` declares Leaderboard /
-> Shop / Missions as `comingSoon` sidebar entries (muted "Soon" pill + placeholder page) —
-> enabling one is a one-line change; `lib/types.ts` holds the shared API view types for
-> new pages to extend. **No API or server changes.** Part of P3's mobile-friendly goal
-> (US27) lands with this (responsive layouts), the rest of P3 stays open.
->
-> **Changelog (2026-09-13) — Part 6:** **US28 (multi-tournament) shipped**, scoped
-> to what Phase 0 covers (teams, schedule, scores, results, standings, playoffs) —
-> the **coin-reset minimum bar is intentionally deferred to Phase 1** with the rest of
-> the economy (coins aren't built yet). The single-tournament `findFirst` is gone:
-> a new **`TournamentService`** resolves the **active tournament per request** and
-> gates access — a new **`resolveTournament` middleware** reads an `X-Tournament-Id`
-> header (falls back to a `?tournament=` query, then to the caller's sole tournament),
-> and every scoped service method now takes an explicit `tournamentId` (compiler-checked
-> across all call sites). **Access:** admins see all tournaments; everyone else sees only
-> the ones they're rostered in (via `MembershipRepo.listByUser`) — requesting one you're
-> not in is a 404, and `/api/me`'s role is now resolved **per active tournament**. New
-> routes: **`GET /api/tournaments`** (accessible list) and **`POST /api/admin/tournaments`**
-> (create from `DEFAULT_TOURNAMENT_CONFIG`, shared with the seed). **Client:** the active
-> id rides an `X-Tournament-Id` header (localStorage-backed), a nav **tournament switcher**,
-> an Admin **Tournaments** section (create + activate), and routed pages remount on switch
-> so per-tournament data refetches. **No schema change / no migration** — every scoped table
-> already carried `tournament_id`. Verified end-to-end: per-tournament roster isolation,
-> membership-gated access (404 for non-members), and admin-only guards (403).
->
-> **Changelog (2026-09-13) — Part 5:** US11–US12 shipped, plus a matchup-matching
-> fix. **Playoffs (US11):** `POST /api/admin/playoffs/seed` seeds the bracket from final
-> round-robin standings (top `playoff_qualifiers`; supports **2 or 4** — the `semifinal|final`
-> enum) → `#1v#4` / `#2v#3`; `status → playoffs`. Advancement is **idempotent** (`sync`,
-> called after every score/sudden-death write): the **final is created from the two semifinal
-> winners** (deferred so team columns stay non-null), and a decided final sets
-> `status → completed` (champion = final winner). **Sudden death (US12):** a tied (3–3)
-> playoff/final leaves the matchup undecided; each captain picks one eligible rep
-> (`POST /api/matchups/:id/sudden-death/rep`), an admin enters the 1v1 result
-> (`POST /api/admin/matchups/:id/sudden-death`, validated **first-to-5 / win-by-2 / cap-7**),
-> and the winner finalizes the matchup → advancement. `sudden_death` rows are now nullable
-> (reps persist before the score; **migration** `…_sudden_death_nullable_and_bracket`).
-> **Matching-timing fix:** random pair assignment now fires only once **every** lineup in a
-> matchup (both teams, all rounds/matches) is locked — never per match — so a captain can't
-> read the opponent's revealed pairs for one match while another is still unlocked. Admins can
-> **re-randomize** a fully-locked, unscored matchup (`POST /api/matchups/:id/lineups/rematch`)
-> if a draw looks lopsided (D12). Standings/seeding count **round-robin only**.
->
-> **Changelog (2026-09-13) — round-robin ties (D19):** since sudden death is **playoff-only**,
-> a round-robin matchup with a level game tally is now a **completed draw** (finalizes with no
-> winner) instead of dangling `in_progress`. Standings show **W-L-T** and rank by **league
-> points (win 3, tie 1, loss 0)** → game diff → point diff → name. **UI labels:** a round-robin
-> tie shows **"Tie"** (no sudden-death wording); a playoff tie's 1v1 decider is shown as
-> **"Overtime"** — the `sudden_death` table/API name is unchanged (UI relabel only). The overtime
-> UI splits by page: **rep selection (setup) on Lineups**, **result entry (scoring) on Results**
-> (shared `Overtime` component, `mode="setup"|"scoring"`); editing a decided final back to a tie
-> **re-opens** the tournament (`completed → playoffs`). Fixes the "0-0 record but 1-1 games"
-> artifact. Also fixed a Lineups UX bug: saving/locking one side no longer wipes the other side's
-> unsaved draft (drafts are matchup-scoped and preserved across refetches).
->
-> **Changelog (2026-09-13) — Part 4:** US9–US10 shipped. Admins enter/edit a per-game
-> score via `PATCH /api/admin/games/:id` (`{scoreHome, scoreAway, courtId?}`); a game must
-> have assigned pairs, scores are non-negative ints, and a tie is rejected (badminton games
-> have a winner). Scoring sets the winning pair, marks the game `final`, and **recomputes the
-> matchup**: per-match round score (e.g. `2–1`) and overall matchup score auto-derive; a
-> decided matchup sets `winnerTeamId` + `status = final`, a level game tally stays
-> `in_progress` awaiting sudden death (US12). Editing a final result re-derives everything
-> (US9). New `GET /api/results` (per-matchup match/matchup scores, revealed pairs) and
-> `GET /api/standings` (record → game diff → point diff → name; final ranks seed playoffs)
-> are read-only for any signed-in user, plus **Results** and **Standings** pages. Standings
-> are **derived at view time** (no `standing` table). No schema change — the `game` score
-> columns and `matchup.status`/`winnerTeamId` were already modeled in Part 2.
->
-> **Changelog (2026-09-12) — Part 3:** US6–US8 shipped. Captains (or admins) submit
-> `pairs_per_lineup` doubles pairs per round from their roster; validation enforces the
-> right pair count, on-roster players, no player in two pairs a round, no duplicate
-> pairing within a matchup (US7). Submit → lock; once **both** sides lock a round the
-> system **randomly matches** home vs away pairs (Fisher–Yates, injectable RNG) and fills
-> the pre-created game shells → `assigned` (US8). Opponent pairs stay hidden until both
-> lock (reveal). Admins can **unlock/override**, which clears a non-final round's random
-> assignment so it can be re-picked and re-matched. New `/api/matchups*` routes + a
-> captain **Lineups** page. No schema change (Part 2 already modeled lineup/pair/game).
->
-> **Changelog (2026-09-12) — Part 2:** circle-method round-robin generation
-> from config, per-game court assignment, admin config editing, manual team swaps and
-> court reassignment. Added a `round_robin_cycles` config knob (default 1) so admins
-> can repeat the whole round robin (e.g. a double round robin) without unbalancing it.
->
-> **Changelog:** Reworked P0/P1/P2 against the *Vibe Coding User Stories* doc, then
-> reconciled §3–§11 to match. The tournament is now **team → captain → pairs** with a
-> **richer economy** (individual player coins, bounties, losing-streak protection,
-> secret missions, commissioner events). **Dropped:** sub-team hierarchy (old US14 /
-> D2, D11–D14), **team** coin wallets (coins are now **per player**), and Excel import.
-> **Notifications are out of scope.**
+> **Status:** Living design doc — captures intent, not a running log; see git history
+> for how it evolved. **Phase 0 (tournament engine) is complete**: auth/roles (US1–US3),
+> round-robin schedule + courts (US4–US5), captain lineups + random pairing (US6–US8),
+> scoring + standings (US9–US10), playoffs + sudden death (US11–US12), and
+> multi-tournament access (US28, minus the coin-reset piece deferred to Phase 1). Next
+> up: **Phase 1 (economy)**. Owner: @jhou98. Last updated: 2026-09-16.
 >
 > **Configurable, not hardcoded:** the reference tournament is 24 players / 4 teams
 > of 6 / 3 round-robin rounds, but team count, team size, pair size, pairs per
@@ -330,12 +208,12 @@ Stored on the `tournament` row (or a small `settings` table); editable while
 *(validation: no player in two pairs of the same lineup; no duplicate pair — same player set — within one matchup)*
 
 **game** — `id`, `matchup_id`, `round_no`, `court_id` (nullable), `home_pair_id` (nullable), `away_pair_id` (nullable), `score_home` (nullable), `score_away` (nullable), `winner_pair_id` (nullable), `status` (`awaiting_lineups` | `assigned` | `final`), `finalized_by`, `finalized_at`, `created_at`
-*(pairs are filled by **random assignment** once both lineups for the round lock — see D3; scores entered/edited by admin.)*
+*(pairs are filled by **random assignment** once **every** lineup in the matchup — both teams, all rounds — locks, never per round (D12); scores entered/edited by admin.)*
 
 **sudden_death** — `id`, `matchup_id`, `team_a_rep` (user_id), `team_b_rep` (user_id), `score_a`, `score_b`, `winner_team_id`, `created_at`
-*(created only when a matchup's game wins tie; rules from `sudden_death_rule`.)*
+*(created whenever a matchup's game tally is level, in round robin or playoffs (D19) — nullable reps/score so a rep pick can persist before the score; rules from `sudden_death_rule`.)*
 
-**standing** — *derived at view time,* not stored: per team → matchup record **W-L-T**, **league points (win 3, tie 1, loss 0)**, games won/lost, game differential, point differential, rank. **A round-robin matchup can end in a tie** (level game tally; sudden death is playoff-only, D19), which finalizes the matchup with no winner and gives both teams a tie. Rank order: **points → game differential → point differential → team name** (admin-defined tiebreaker still deferred). Final round-robin ranks seed the playoff bracket.
+**standing** — *derived at view time,* not stored: per team → matchup record **W-L**, games won/lost, game differential, point differential, rank. **No round-robin ties** (D19): a level game tally goes to sudden death like a playoff tie, so every finalized matchup has a winner. Rank order: **matchups won → game differential → point differential → team name** (admin-defined tiebreaker still deferred). Final round-robin ranks seed the playoff bracket.
 
 ### Economy tables (P1) — coins are **per player**
 
@@ -428,8 +306,10 @@ team, and captain.
 3. For each matchup round, each **captain** picks `pairs_per_lineup` pairs from their roster and
    **locks** the lineup (validation: right pair count, no player twice, no duplicate pair in the
    matchup). Admin can unlock/override.
-4. Once **both** lineups for a round lock, the system **randomly assigns** home pairs ↔ away pairs,
-   creates the `game` rows, and records the assignment immutably (US8).
+4. Once **every** lineup in the matchup — both teams, all rounds — locks, the system **randomly
+   assigns** home pairs ↔ away pairs for each round, creates the `game` rows, and records the
+   assignment immutably (US8). This is gated at the matchup level, not per round, so a captain can't
+   read a revealed pairing for one round while another round is still unlocked.
 5. Admin enters each game's score → `game.status = final`; round score (e.g. `2–1`) and matchup
    winner auto-compute. Admin can re-edit a final game; standings and coins recompute idempotently.
 6. **Standings** (record → differential → tiebreaker) update live and, at round-robin's end, **seed
@@ -505,7 +385,8 @@ POST   /api/admin/coins/adjust          manual adjust/reverse {user_id, delta, n
 ```
 
 **No player score submissions:** per the source doc, **admins enter scores** (`PATCH
-/api/admin/games/:id`); random pair assignment happens automatically when both lineups lock.
+/api/admin/games/:id`); random pair assignment happens automatically once the whole matchup's
+lineups lock (D12).
 
 ---
 
@@ -576,7 +457,7 @@ between captains → lineups → randomized matchups → results → standings �
 | **D9** | Hosting | **Stateless box** (EC2 free-tier) serves API + SPA; data in **RDS PostgreSQL** in the same region/VPC. Box is disposable. *(Updated 2026-09-15 — RDS Postgres, was Aurora Serverless v2; earlier was "data in Neon" with Lightsail as the box.)* |
 | **D10** | Powerups affect standings? | **No** — `restrictions_meta`/effect notes only; admin applies effects manually. |
 | **D11** | Matchup & bracket structure | **All config.** A matchup = `rounds_per_matchup` × `pairs_per_lineup` games; winner = most game wins; an even split → sudden death. Round robin generates via the **circle method** from `team_count`; playoffs are a **seeded single-elim** of the top `playoff_qualifiers`. |
-| **D12** | Random matchup assignment | System **randomly pairs** home↔away pairs once **both** lineups for a round lock; the assignment is **immutable + recorded**. Captains never pick the opposing pair (re-run only before games start, on a technical fault). |
+| **D12** | Random matchup assignment | System **randomly pairs** home↔away pairs once **every** lineup in the matchup — both teams, all rounds — locks (never per round, so a captain can't see one round's reveal while another is still unlocked); the assignment is **immutable + recorded**. Captains never pick the opposing pair. An admin can re-randomize a fully-locked, unscored matchup if a draw looks lopsided. |
 | **D15** | Deployment architecture | **Option ① — stateless box + managed RDS PostgreSQL (same region/VPC)**, coded for serverless portability (ports & adapters, §11). Provisioned as **IaC (AWS CDK) with GitHub Actions CI/CD**, per-environment (prod/staging/dev). Serverless port is **compute-only** (Lambda + API Gateway) — no DB migration. *(Updated 2026-09-15 — RDS Postgres + CDK/CI-CD; was managed Aurora Serverless v2, earlier Neon.)* |
 | **D16** | Streak bonus direction | **Both, configurable** via `streak_rule.direction` (`loss` \| `win` \| `both`). Losing-streak protection default from the source doc (+25/+50/+75 at 2/3/4+ losses); win-streak reward uses the same tiered shape. A streak resets when the run breaks. Amounts/tiers admin-tunable. |
 | **D17** | Bounty / mission completion | **Admin marks complete.** Commissioner/admin confirms a bounty or mission was earned, which writes the coin credit. (Auto-detection of common bounty conditions can be added later.) |
