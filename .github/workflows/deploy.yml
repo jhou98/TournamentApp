@@ -5,8 +5,7 @@ name: Deploy to AWS
 # tests + CFN validation run first (the `ci` job) and gate the deploy.
 #
 # Per-environment AWS config uses GitHub Environments (Settings -> Environments):
-# set these as environment-scoped variables/secrets on each of prod/staging/dev
-# (see infra/README.md):
+# set these as environment-scoped variables/secrets on each of prod/dev
 #   Variables: AWS_REGION, AWS_DEPLOY_ROLE_ARN
 #   Secrets:   BOOTSTRAP_ADMIN_CODE, REGISTRATION_CODE
 on:
@@ -15,7 +14,7 @@ on:
       environment:
         description: Target environment.
         type: choice
-        options: [prod, staging, dev]
+        options: [prod, dev]
         default: dev
       ref:
         description: Branch or tag to deploy (e.g. main or a feature branch).

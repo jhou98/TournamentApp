@@ -10,6 +10,9 @@ export interface InfrastructureStackProps extends cdk.StackProps {
   readonly appName: string;
   readonly environment: string;
   readonly appPort: number;
+  readonly dbAllocatedStorageGb: number;
+  readonly dbBackupRetentionDays: number;
+  readonly ec2InstanceSize: ec2.InstanceSize;
 }
 
 /** TournamentApp infrastructure: a public EC2 box + private RDS Postgres. */
@@ -17,7 +20,7 @@ export class InfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: InfrastructureStackProps) {
     super(scope, id, props);
 
-    const { appName, environment, appPort } = props;
+    const { appName, environment, appPort, dbAllocatedStorageGb, dbBackupRetentionDays, ec2InstanceSize } = props;
     const prefix = `${appName}-${environment}`;
 
     // Passed at deploy time; never stored in the repo.
@@ -87,12 +90,12 @@ export class InfrastructureStack extends cdk.Stack {
         secretName: `${appName}/${environment}/db`,
       }),
       databaseName: "tournament",
-      allocatedStorage: 20,
+      allocatedStorage: dbAllocatedStorageGb,
       storageType: rds.StorageType.GP3,
       storageEncrypted: true,
       multiAz: false,
       publiclyAccessible: false,
-      backupRetention: cdk.Duration.days(7),
+      backupRetention: cdk.Duration.days(dbBackupRetentionDays),
       deletionProtection: false,
       removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
     });
@@ -158,7 +161,7 @@ export class InfrastructureStack extends cdk.Stack {
     const instance = new ec2.Instance(this, "App", {
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO),
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2InstanceSize),
       machineImage: ec2.MachineImage.latestAmazonLinux2023(),
       securityGroup: appSg,
       role: instanceRole,
