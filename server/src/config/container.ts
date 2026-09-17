@@ -13,6 +13,8 @@ import { makePrismaLineupRepo } from "../adapters/db/prisma/lineupRepo.js";
 import { makePrismaSuddenDeathRepo } from "../adapters/db/prisma/suddenDeathRepo.js";
 import { makePrismaCoinLedgerRepo } from "../adapters/db/prisma/coinLedgerRepo.js";
 import { makePrismaBountyRepo } from "../adapters/db/prisma/bountyRepo.js";
+import { makePrismaPowerupRepo } from "../adapters/db/prisma/powerupRepo.js";
+import { makePrismaPurchaseRepo } from "../adapters/db/prisma/purchaseRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -25,6 +27,8 @@ import { makeLineupService, type LineupService } from "../services/lineupService
 import { makeResultsService, type ResultsService } from "../services/resultsService.js";
 import { makeEconomyService, type EconomyService } from "../services/economyService.js";
 import { makeBountyService, type BountyService } from "../services/bountyService.js";
+import { makePowerupService, type PowerupService } from "../services/powerupService.js";
+import { makeShopService, type ShopService } from "../services/shopService.js";
 import { makePlayoffsService, type PlayoffsService } from "../services/playoffsService.js";
 import { makeSuddenDeathService, type SuddenDeathService } from "../services/suddenDeathService.js";
 import type { UnitOfWork } from "../ports/index.js";
@@ -45,6 +49,8 @@ export interface Container {
     suddenDeath: SuddenDeathService;
     economy: EconomyService;
     bounties: BountyService;
+    powerups: PowerupService;
+    shop: ShopService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -64,6 +70,8 @@ export function buildContainer(env: Env): Container {
   const suddenDeathRepo = makePrismaSuddenDeathRepo();
   const coinLedger = makePrismaCoinLedgerRepo();
   const bountyRepo = makePrismaBountyRepo();
+  const powerupRepo = makePrismaPowerupRepo();
+  const purchaseRepo = makePrismaPurchaseRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -137,6 +145,14 @@ export function buildContainer(env: Env): Container {
     uow: unitOfWork,
   });
 
+  const powerups = makePowerupService({ powerups: powerupRepo });
+  const shop = makeShopService({
+    powerups: powerupRepo,
+    purchases: purchaseRepo,
+    coinLedger,
+    uow: unitOfWork,
+  });
+
   const results = makeResultsService({
     tournaments,
     matchups,
@@ -186,6 +202,8 @@ export function buildContainer(env: Env): Container {
       suddenDeath,
       economy,
       bounties,
+      powerups,
+      shop,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };

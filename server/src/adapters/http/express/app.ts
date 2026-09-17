@@ -15,6 +15,7 @@ import { matchupsRouter } from "./routes/matchups.js";
 import { resultsRouter } from "./routes/results.js";
 import { leaderboardRouter } from "./routes/leaderboard.js";
 import { bountiesRouter } from "./routes/bounties.js";
+import { shopRouter } from "./routes/shop.js";
 import { tournamentsRouter } from "./routes/tournaments.js";
 
 export function createApp(container: Container): Express {
@@ -54,6 +55,7 @@ export function createApp(container: Container): Express {
       container.services.suddenDeath,
       container.services.economy,
       container.services.bounties,
+      container.services.powerups,
       container.services.tournaments,
       container.authMiddleware,
     ),
@@ -79,6 +81,10 @@ export function createApp(container: Container): Express {
   api.use(
     "/bounties",
     bountiesRouter(container.services.bounties, container.services.tournaments, container.authMiddleware),
+  );
+  api.use(
+    "/shop",
+    shopRouter(container.services.shop, container.services.tournaments, container.authMiddleware),
   );
   app.use("/api", api);
 
