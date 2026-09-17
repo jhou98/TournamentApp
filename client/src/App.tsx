@@ -10,6 +10,8 @@ import { Home } from "./pages/Home";
 import { Profile } from "./pages/Profile";
 import { Leaderboard } from "./pages/Leaderboard";
 import { Bounties } from "./pages/Bounties";
+import { Shop } from "./pages/Shop";
+import { Inventory } from "./pages/Inventory";
 import { ComingSoon } from "./pages/ComingSoon";
 import { TournamentHub } from "./pages/tournament/TournamentHub";
 import { Schedule } from "./pages/tournament/Schedule";
@@ -21,6 +23,7 @@ import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminTeams } from "./pages/admin/AdminTeams";
 import { AdminCoins } from "./pages/admin/AdminCoins";
 import { AdminBounties } from "./pages/admin/AdminBounties";
+import { AdminPowerups } from "./pages/admin/AdminPowerups";
 import { AdminTournaments } from "./pages/admin/AdminTournaments";
 import { AdminSettings } from "./pages/admin/AdminSettings";
 
@@ -111,6 +114,7 @@ function Shell() {
           <Route path="teams" element={<AdminTeams />} />
           <Route path="coins" element={<AdminCoins />} />
           <Route path="bounties" element={<AdminBounties />} />
+          <Route path="powerups" element={<AdminPowerups />} />
           <Route path="tournaments" element={<AdminTournaments />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
@@ -118,8 +122,10 @@ function Shell() {
         <Route path="leaderboard" element={<Leaderboard />} />
         <Route path="bounties" element={<Bounties />} />
 
+        <Route path="shop" element={<Shop />} />
+        <Route path="inventory" element={<Inventory />} />
+
         {/* Future phases — placeholders until the features ship (see lib/nav.ts). */}
-        <Route path="shop" element={<ComingSoon />} />
         <Route path="missions" element={<ComingSoon />} />
 
         {/* Legacy flat routes from the first UI. */}

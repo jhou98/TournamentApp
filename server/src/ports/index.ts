@@ -51,3 +51,5 @@ export type {
   CoinReason,
 } from "./CoinLedgerRepo.js";
 export type { BountyRepo, BountyRecord, NewBounty, BountyTargetType } from "./BountyRepo.js";
+export type { PowerupRepo, PowerupRecord, NewPowerup, PowerupUpdate } from "./PowerupRepo.js";
+export type { PurchaseRepo, PurchaseRecord, NewPurchase } from "./PurchaseRepo.js";

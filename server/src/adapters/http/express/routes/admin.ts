@@ -8,6 +8,7 @@ import type { PlayoffsService } from "../../../../services/playoffsService.js";
 import type { SuddenDeathService } from "../../../../services/suddenDeathService.js";
 import type { EconomyService } from "../../../../services/economyService.js";
 import type { BountyService } from "../../../../services/bountyService.js";
+import type { PowerupService } from "../../../../services/powerupService.js";
 import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { makeResolveTournament } from "../middleware/tournament.js";
@@ -85,6 +86,19 @@ const createBountySchema = z.object({
   coinValue: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
 });
 const awardBountySchema = z.object({ winnerId: z.string().min(1).optional() });
+const createPowerupSchema = z.object({
+  name: safeText({ min: 1, max: 60 }),
+  description: safeText({ min: 1, max: 200 }),
+  cost: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
+});
+const updatePowerupSchema = z
+  .object({
+    name: safeText({ min: 1, max: 60 }),
+    description: safeText({ min: 1, max: 200 }),
+    cost: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "Provide at least one field to update" });
 const resetCoinsSchema = z.object({ note: safeText({ min: 0, max: 200 }).optional() });
 
 // Coin values feed per-game/streak ledger rows (a 32-bit int column) — bound
@@ -127,6 +141,7 @@ export function adminRouter(
   suddenDeath: SuddenDeathService,
   economy: EconomyService,
   bounties: BountyService,
+  powerups: PowerupService,
   tournaments: TournamentService,
   mw: AuthMiddleware,
 ): Router {
@@ -397,6 +412,39 @@ export function adminRouter(
     "/bounties/:id",
     asyncHandler(async (req, res) => {
       await bounties.remove(req.tournamentId!, requireParam(req, "id"));
+      res.status(204).end();
+    }),
+  );
+
+  // --- Powerups / shop catalog (US19: admin creates, edits, removes) ------
+
+  router.get(
+    "/powerups",
+    asyncHandler(async (req, res) => {
+      res.json({ powerups: await powerups.listByTournament(req.tournamentId!) });
+    }),
+  );
+
+  router.post(
+    "/powerups",
+    asyncHandler(async (req, res) => {
+      const input = parse(createPowerupSchema, req.body);
+      res.status(201).json({ powerup: await powerups.create({ tournamentId: req.tournamentId!, ...input }) });
+    }),
+  );
+
+  router.patch(
+    "/powerups/:id",
+    asyncHandler(async (req, res) => {
+      const patch = parse(updatePowerupSchema, req.body);
+      res.json({ powerup: await powerups.update(req.tournamentId!, requireParam(req, "id"), patch) });
+    }),
+  );
+
+  router.delete(
+    "/powerups/:id",
+    asyncHandler(async (req, res) => {
+      await powerups.remove(req.tournamentId!, requireParam(req, "id"));
       res.status(204).end();
     }),
   );

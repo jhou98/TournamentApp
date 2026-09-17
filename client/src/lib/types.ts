@@ -183,6 +183,42 @@ export interface BountyView {
   createdAt: string;
 }
 
+/* --- GET/POST/PATCH/DELETE /api/admin/powerups (shop catalog) ------------ */
+
+export interface PowerupView {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/* --- GET /api/shop, POST /api/shop/:id/buy, GET /api/shop/inventory ------ */
+
+export interface ShopPowerupView {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  /** True if the signed-in player already owns this powerup. */
+  owned: boolean;
+}
+
+export interface InventoryItemView {
+  id: string;
+  powerupId: string;
+  name: string;
+  description: string;
+  cost: number;
+  purchasedAt: string;
+}
+
+export interface PurchaseResult {
+  purchase: InventoryItemView;
+  balance: number;
+}
+
 /* --- GET/PATCH /api/admin/tournament/rules ------------------------------- */
 
 export interface CoinRule {

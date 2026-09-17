@@ -74,6 +74,7 @@ model User {
   suddenDeathAsA   SuddenDeath[]  @relation("SuddenDeathTeamARep")
   suddenDeathAsB   SuddenDeath[]  @relation("SuddenDeathTeamBRep")
   coinTransactions CoinTransaction[]
+  purchases        Purchase[]
 
   @@map("user")
 }
@@ -118,6 +119,8 @@ model Tournament {
   courts           Court[]
   coinTransactions CoinTransaction[]
   bounties         Bounty[]
+  powerups         Powerup[]
+  purchases        Purchase[]
 
   @@map("tournament")
 }
@@ -333,4 +336,43 @@ model Bounty {
 
   @@index([tournamentId])
   @@map("bounty")
+}
+
+// Shop catalog entry (US19, scoped down for now — no category/stock/activation
+// timing/playoff-only yet; see artifact.md §7 for the fuller shape those add
+// later). Unlimited stock: any number of players can eventually buy one.
+model Powerup {
+  id           String   @id @default(cuid())
+  tournamentId String
+  name         String
+  description  String
+  cost         Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  purchases  Purchase[]
+
+  @@index([tournamentId])
+  @@map("powerup")
+}
+
+// A player owning a powerup (US20, scoped down for now — no activation/used
+// state yet). One row per (user, powerup): a player can own at most one of
+// each. Deleting the powerup drops the purchase with it (no dangling ref).
+model Purchase {
+  id           String   @id @default(cuid())
+  tournamentId String
+  userId       String
+  powerupId    String
+  costPaid     Int
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  powerup    Powerup    @relation(fields: [powerupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, powerupId])
+  @@index([tournamentId, userId])
+  @@map("purchase")
 }

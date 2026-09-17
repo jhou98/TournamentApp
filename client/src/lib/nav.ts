@@ -25,7 +25,8 @@ export const NAV: NavItem[] = [
   { to: "/captain", label: "Captain Panel", icon: "users", roles: ["captain", "admin"] },
   { to: "/leaderboard", label: "Leaderboard", icon: "coins" },
   { to: "/bounties", label: "Bounties", icon: "flag" },
-  { to: "/shop", label: "Shop", icon: "shop", comingSoon: true, phase: "Phase 2 · power-ups (US19–US22)" },
+  { to: "/shop", label: "Shop", icon: "shop" },
+  { to: "/inventory", label: "Inventory", icon: "layers" },
   { to: "/missions", label: "Missions", icon: "target", comingSoon: true, phase: "Phase 2 · commissioner (US23–US24)" },
   { to: "/admin", label: "Admin Panel", icon: "shield", roles: ["admin"] },
 ];
