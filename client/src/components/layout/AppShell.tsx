@@ -53,7 +53,9 @@ function Sidebar({ className }: { className?: string }) {
   const { profile, logout, tournaments, activeTournamentId, setActiveTournament } = useAuth();
   if (!profile) return null;
   const active = tournaments.find((t) => t.id === activeTournamentId) ?? null;
-  const items = visibleNav(profile.role, active?.shopVisible ?? true);
+  // Fail closed: no accessible tournament (e.g. not yet assigned to a team)
+  // means no known shopVisible flag, so hide rather than default to shown.
+  const items = visibleNav(profile.role, active?.shopVisible ?? false);
 
   return (
     <aside

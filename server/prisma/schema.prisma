@@ -75,6 +75,7 @@ model User {
   suddenDeathAsB   SuddenDeath[]  @relation("SuddenDeathTeamBRep")
   coinTransactions CoinTransaction[]
   purchases        Purchase[]
+  potluckRsvps     PotluckRsvp[]
 
   @@map("user")
 }
@@ -114,6 +115,10 @@ model Tournament {
   // Pre-release feature flag (not locked to setup, unlike config above):
   // hides Shop/Inventory from captains/players while still visible to admins.
   shopVisible       Boolean          @default(true)
+  // Potluck event details, admin-editable any time. Null until the admin sets
+  // them — the Potluck page shows a "coming soon" state until then.
+  potluckEventAt    DateTime?
+  potluckAddress    String?
 
   createdAt DateTime @default(now())
 
@@ -124,6 +129,7 @@ model Tournament {
   bounties         Bounty[]
   powerups         Powerup[]
   purchases        Purchase[]
+  potluckRsvps     PotluckRsvp[]
 
   @@map("tournament")
 }
@@ -385,4 +391,22 @@ model Purchase {
   @@unique([userId, powerupId])
   @@index([tournamentId, userId])
   @@map("purchase")
+}
+
+// A player's potluck RSVP: whether they're attending and what they're
+// bringing (only meaningful when attending). One row per (user, tournament),
+// upserted whenever they change their answer.
+model PotluckRsvp {
+  id           String   @id @default(cuid())
+  tournamentId String
+  userId       String
+  attending    Boolean
+  item         String?
+  updatedAt    DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@unique([tournamentId, userId])
+  @@map("potluck_rsvp")
 }

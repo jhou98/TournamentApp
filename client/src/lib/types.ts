@@ -219,6 +219,30 @@ export interface PurchaseResult {
   balance: number;
 }
 
+/* --- GET /api/potluck, POST /api/potluck/rsvp (+ admin PATCH) ------------ */
+
+export interface PotluckSettings {
+  /** ISO timestamp of the event, or null until the admin sets it. */
+  eventAt: string | null;
+  address: string | null;
+}
+
+export interface PotluckAttendee {
+  displayName: string;
+  item: string | null;
+}
+
+export interface MyPotluckRsvp {
+  attending: boolean;
+  item: string | null;
+}
+
+export interface PotluckView {
+  settings: PotluckSettings;
+  myRsvp: MyPotluckRsvp | null;
+  attendees: PotluckAttendee[];
+}
+
 /* --- GET/PATCH /api/admin/tournament/rules ------------------------------- */
 
 export interface CoinRule {

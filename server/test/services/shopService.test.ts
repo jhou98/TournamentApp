@@ -335,6 +335,8 @@ function buildService(stores: Stores): ShopService {
         coinRule: {} as never,
         streakRule: {} as never,
         shopVisible: stores.shopVisible,
+        potluckEventAt: null,
+        potluckAddress: null,
       };
     },
     async list() {
@@ -354,6 +356,9 @@ function buildService(stores: Stores): ShopService {
       throw new Error("not used");
     },
     async setShopVisible() {
+      throw new Error("not used");
+    },
+    async setPotluckDetails() {
       throw new Error("not used");
     },
   };

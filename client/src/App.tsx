@@ -10,6 +10,7 @@ import { Home } from "./pages/Home";
 import { Profile } from "./pages/Profile";
 import { Leaderboard } from "./pages/Leaderboard";
 import { Bounties } from "./pages/Bounties";
+import { Potluck } from "./pages/Potluck";
 import { Shop } from "./pages/Shop";
 import { Inventory } from "./pages/Inventory";
 import { ComingSoon } from "./pages/ComingSoon";
@@ -132,6 +133,7 @@ function Shell() {
 
         <Route path="leaderboard" element={<Leaderboard />} />
         <Route path="bounties" element={<Bounties />} />
+        <Route path="potluck" element={<Potluck />} />
 
         <Route
           path="shop"

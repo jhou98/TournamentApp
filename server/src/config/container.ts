@@ -15,6 +15,7 @@ import { makePrismaCoinLedgerRepo } from "../adapters/db/prisma/coinLedgerRepo.j
 import { makePrismaBountyRepo } from "../adapters/db/prisma/bountyRepo.js";
 import { makePrismaPowerupRepo } from "../adapters/db/prisma/powerupRepo.js";
 import { makePrismaPurchaseRepo } from "../adapters/db/prisma/purchaseRepo.js";
+import { makePrismaPotluckRsvpRepo } from "../adapters/db/prisma/potluckRsvpRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -29,6 +30,7 @@ import { makeEconomyService, type EconomyService } from "../services/economyServ
 import { makeBountyService, type BountyService } from "../services/bountyService.js";
 import { makePowerupService, type PowerupService } from "../services/powerupService.js";
 import { makeShopService, type ShopService } from "../services/shopService.js";
+import { makePotluckService, type PotluckService } from "../services/potluckService.js";
 import { makePlayoffsService, type PlayoffsService } from "../services/playoffsService.js";
 import { makeSuddenDeathService, type SuddenDeathService } from "../services/suddenDeathService.js";
 import type { UnitOfWork } from "../ports/index.js";
@@ -51,6 +53,7 @@ export interface Container {
     bounties: BountyService;
     powerups: PowerupService;
     shop: ShopService;
+    potluck: PotluckService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -72,6 +75,7 @@ export function buildContainer(env: Env): Container {
   const bountyRepo = makePrismaBountyRepo();
   const powerupRepo = makePrismaPowerupRepo();
   const purchaseRepo = makePrismaPurchaseRepo();
+  const potluckRsvpRepo = makePrismaPotluckRsvpRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -158,6 +162,8 @@ export function buildContainer(env: Env): Container {
     uow: unitOfWork,
   });
 
+  const potluck = makePotluckService({ rsvps: potluckRsvpRepo, tournaments, users });
+
   const results = makeResultsService({
     tournaments,
     matchups,
@@ -209,6 +215,7 @@ export function buildContainer(env: Env): Container {
       bounties,
       powerups,
       shop,
+      potluck,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };

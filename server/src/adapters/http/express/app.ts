@@ -16,6 +16,7 @@ import { resultsRouter } from "./routes/results.js";
 import { leaderboardRouter } from "./routes/leaderboard.js";
 import { bountiesRouter } from "./routes/bounties.js";
 import { shopRouter } from "./routes/shop.js";
+import { potluckRouter } from "./routes/potluck.js";
 import { tournamentsRouter } from "./routes/tournaments.js";
 
 export function createApp(container: Container): Express {
@@ -85,6 +86,10 @@ export function createApp(container: Container): Express {
   api.use(
     "/shop",
     shopRouter(container.services.shop, container.services.tournaments, container.authMiddleware),
+  );
+  api.use(
+    "/potluck",
+    potluckRouter(container.services.potluck, container.services.tournaments, container.authMiddleware),
   );
   app.use("/api", api);
 
