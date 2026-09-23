@@ -15,6 +15,9 @@ export function makePrismaPurchaseRepo(): PurchaseRepo {
     async create(purchase) {
       return getDb().purchase.create({ data: purchase, select: RECORD_SELECT });
     },
+    async findById(id) {
+      return getDb().purchase.findUnique({ where: { id }, select: RECORD_SELECT });
+    },
     async listByUser(tournamentId, userId) {
       return getDb().purchase.findMany({
         where: { tournamentId, userId },
@@ -27,6 +30,9 @@ export function makePrismaPurchaseRepo(): PurchaseRepo {
         where: { userId_powerupId: { userId, powerupId } },
         select: RECORD_SELECT,
       });
+    },
+    async delete(id) {
+      await getDb().purchase.delete({ where: { id } });
     },
   };
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 import { orderRounds, type CoinRule, type EconomyRules, type ScheduleView, type StreakRule } from "../../lib/types";
 import { useToast } from "../../components/Toast";
 import { Alert, Button, Card, EmptyState, Field, InfoHint, Input, Select, StatusPill } from "../../components/ui";
@@ -91,6 +92,9 @@ export function AdminSettings() {
   return (
     <>
       {error && <Alert tone="error">{error}</Alert>}
+
+      {/* --- Shop visibility ------------------------------------------------ */}
+      <ShopVisibilityCard />
 
       {/* --- Config -------------------------------------------------------- */}
       <Card
@@ -262,6 +266,49 @@ export function AdminSettings() {
         </Card>
       ))}
     </>
+  );
+}
+
+/** Pre-release flag: hides Shop/Inventory from captains/players while admins always see them. */
+function ShopVisibilityCard() {
+  const { tournaments, activeTournamentId, refresh } = useAuth();
+  const { showToast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const active = tournaments.find((t) => t.id === activeTournamentId);
+  if (!active) return null;
+
+  async function toggle() {
+    if (!active || busy) return;
+    setBusy(true);
+    try {
+      await api("/admin/tournament/shop-visibility", {
+        method: "PATCH",
+        body: JSON.stringify({ visible: !active.shopVisible }),
+      });
+      await refresh();
+      showToast(
+        active.shopVisible ? "Shop hidden from captains/players." : "Shop is now visible to captains/players.",
+        "success",
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not update shop visibility", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card
+      className="mb-5"
+      title="Shop visibility"
+      subtitle="Admins always see the Shop and Inventory — this only affects captains and players."
+    >
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={active.shopVisible} disabled={busy} onChange={toggle} />
+        <span className="font-semibold">Visible to captains/players</span>
+      </label>
+    </Card>
   );
 }
 

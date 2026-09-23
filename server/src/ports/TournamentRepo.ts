@@ -11,6 +11,8 @@ export type TournamentStatus = "setup" | "round_robin" | "playoffs" | "completed
 /** A tournament shown in a picker: identity + current status. */
 export interface TournamentSummary extends TournamentRef {
   status: TournamentStatus;
+  /** Pre-release flag: whether captains/players can see the Shop/Inventory (admins always can). */
+  shopVisible: boolean;
 }
 
 /** The editable numeric shape of the tournament (rules JSON is handled elsewhere). */
@@ -29,6 +31,7 @@ export interface TournamentDetail extends TournamentRef, TournamentConfig {
   status: TournamentStatus;
   coinRule: CoinRule;
   streakRule: StreakRule;
+  shopVisible: boolean;
 }
 
 /** Everything needed to create a tournament row (config + the rules JSON blobs). */
@@ -54,4 +57,6 @@ export interface TournamentRepo {
     id: string,
     patch: { coinRule?: CoinRule; streakRule?: StreakRule },
   ): Promise<TournamentDetail>;
+  /** Toggle the Shop/Inventory pre-release flag — not locked to setup, unlike config. */
+  setShopVisible(id: string, visible: boolean): Promise<TournamentDetail>;
 }

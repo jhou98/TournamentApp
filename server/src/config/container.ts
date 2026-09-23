@@ -150,6 +150,11 @@ export function buildContainer(env: Env): Container {
     powerups: powerupRepo,
     purchases: purchaseRepo,
     coinLedger,
+    memberships,
+    games: gamesRepo,
+    matchups,
+    lineups,
+    tournaments,
     uow: unitOfWork,
   });
 

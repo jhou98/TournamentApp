@@ -35,6 +35,7 @@ function tournamentDetail(): TournamentDetail {
     courtCount: 6,
     coinRule: DEFAULT_COIN_RULE,
     streakRule: DEFAULT_STREAK_RULE,
+    shopVisible: true,
   };
 }
 
@@ -43,10 +44,10 @@ const currentTournament: TournamentRepo = {
     return id === TID ? tournamentDetail() : null;
   },
   async list() {
-    return [{ id: TID, name: "Test", status: currentStatus }];
+    return [{ id: TID, name: "Test", status: currentStatus, shopVisible: true }];
   },
   async listByIds(ids) {
-    return ids.includes(TID) ? [{ id: TID, name: "Test", status: currentStatus }] : [];
+    return ids.includes(TID) ? [{ id: TID, name: "Test", status: currentStatus, shopVisible: true }] : [];
   },
   async create() {
     throw new Error("not used");
@@ -58,6 +59,9 @@ const currentTournament: TournamentRepo = {
     throw new Error("not used");
   },
   async updateRules() {
+    throw new Error("not used");
+  },
+  async setShopVisible() {
     throw new Error("not used");
   },
 };

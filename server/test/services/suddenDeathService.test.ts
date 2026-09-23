@@ -41,6 +41,7 @@ function detail(): TournamentDetail {
     courtCount: 2,
     coinRule: DEFAULT_COIN_RULE,
     streakRule: DEFAULT_STREAK_RULE,
+    shopVisible: true,
   };
 }
 
@@ -72,8 +73,8 @@ function tiedFinal(stage: MatchupRecord["stage"] = "final"): Stores {
     winnerTeamId: null,
   };
   const games: GameRecord[] = [
-    { id: "g1", matchupId: MID, roundNo: 1, courtId: "c1", homePairId: "ph1", awayPairId: "pa1", scoreHome: 21, scoreAway: 10, winnerPairId: "ph1", status: "final" },
-    { id: "g2", matchupId: MID, roundNo: 2, courtId: "c1", homePairId: "ph2", awayPairId: "pa2", scoreHome: 10, scoreAway: 21, winnerPairId: "pa2", status: "final" },
+    { id: "g1", matchupId: MID, roundNo: 1, courtId: "c1", homePairId: "ph1", awayPairId: "pa1", scoreHome: 21, scoreAway: 10, winnerPairId: "ph1", status: "final", teamAPowerupUsedBy: null, teamBPowerupUsedBy: null },
+    { id: "g2", matchupId: MID, roundNo: 2, courtId: "c1", homePairId: "ph2", awayPairId: "pa2", scoreHome: 10, scoreAway: 21, winnerPairId: "pa2", status: "final", teamAPowerupUsedBy: null, teamBPowerupUsedBy: null },
   ];
   const memberships: MembershipRecord[] = [
     { id: "m-a1", userId: "a1", teamId: TA, tournamentId: TID, role: "captain", createdAt: new Date() },
@@ -91,11 +92,11 @@ function buildService(stores: Stores): SuddenDeathService {
     },
     async list() {
       const t = detail();
-      return [{ id: t.id, name: t.name, status: t.status }];
+      return [{ id: t.id, name: t.name, status: t.status, shopVisible: t.shopVisible }];
     },
     async listByIds(ids) {
       const t = detail();
-      return ids.includes(t.id) ? [{ id: t.id, name: t.name, status: t.status }] : [];
+      return ids.includes(t.id) ? [{ id: t.id, name: t.name, status: t.status, shopVisible: t.shopVisible }] : [];
     },
     async create() {
       throw new Error("not used");
@@ -105,6 +106,9 @@ function buildService(stores: Stores): SuddenDeathService {
       throw new Error("not used");
     },
     async updateRules() {
+      throw new Error("not used");
+    },
+    async setShopVisible() {
       throw new Error("not used");
     },
   };
@@ -223,6 +227,9 @@ function buildService(stores: Stores): SuddenDeathService {
       return 0;
     },
     async deleteByTournament() {
+      throw new Error("not used");
+    },
+    async claimPowerupSlot() {
       throw new Error("not used");
     },
   };

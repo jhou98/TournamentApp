@@ -111,6 +111,9 @@ model Tournament {
   coinRule          Json
   streakRule        Json
   suddenDeathRule   Json
+  // Pre-release feature flag (not locked to setup, unlike config above):
+  // hides Shop/Inventory from captains/players while still visible to admins.
+  shopVisible       Boolean          @default(true)
 
   createdAt DateTime @default(now())
 
@@ -256,6 +259,13 @@ model Game {
   finalizedBy  String?
   finalizedAt  DateTime?
   createdAt    DateTime   @default(now())
+  // The "one powerup per team per game" slot (US21, scoped down — no
+  // activation window yet). Null = unused; set to the userId who used it,
+  // keyed to the matchup's teamA/teamB. Using a powerup deletes the Purchase
+  // (consumed for good, free to rebuy) and claims this slot instead, locking
+  // out every other player on that team for the rest of the game.
+  teamAPowerupUsedBy String?
+  teamBPowerupUsedBy String?
 
   matchup    Matchup @relation(fields: [matchupId], references: [id])
   court      Court?  @relation(fields: [courtId], references: [id])
@@ -357,9 +367,9 @@ model Powerup {
   @@map("powerup")
 }
 
-// A player owning a powerup (US20, scoped down for now — no activation/used
-// state yet). One row per (user, powerup): a player can own at most one of
-// each. Deleting the powerup drops the purchase with it (no dangling ref).
+// A player owning a powerup (US20). One row per (user, powerup) — a player can
+// own at most one *active* copy of a given powerup at a time. Using it
+// deletes the row (consumed for good), which frees the slot to buy again.
 model Purchase {
   id           String   @id @default(cuid())
   tournamentId String

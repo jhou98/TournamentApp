@@ -100,6 +100,7 @@ const updatePowerupSchema = z
   .partial()
   .refine((v) => Object.keys(v).length > 0, { message: "Provide at least one field to update" });
 const resetCoinsSchema = z.object({ note: safeText({ min: 0, max: 200 }).optional() });
+const shopVisibilitySchema = z.object({ visible: z.boolean() });
 
 // Coin values feed per-game/streak ledger rows (a 32-bit int column) — bound
 // them to the same per-transaction cap so a rule can't overflow the ledger.
@@ -269,6 +270,15 @@ export function adminRouter(
     "/schedule/generate",
     asyncHandler(async (req, res) => {
       res.status(201).json({ schedule: await schedule.generate(req.tournamentId!) });
+    }),
+  );
+
+  router.patch(
+    "/tournament/shop-visibility",
+    asyncHandler(async (req, res) => {
+      const { visible } = parse(shopVisibilitySchema, req.body);
+      const tournament = await tournaments.setShopVisible(req.tournamentId!, visible);
+      res.json({ shopVisible: tournament.shopVisible });
     }),
   );
 

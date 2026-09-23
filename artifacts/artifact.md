@@ -422,11 +422,11 @@ between captains → lineups → randomized matchups → results → standings �
   (3 pairs, validated, lock/unlock), random matchup assignment, match scoring +
   standings, playoff bracket, sudden death, finals.
 - **Phase 1 (P1 — economy):** per-player coin ledger, match rewards (configurable),
-  losing-streak protection, bounties, coin leaderboard.
+  losing-streak protection, bounties, coin leaderboard, activity/history view,.
 - **Phase 2 (P2 — power-ups + commissioner):** power-up catalog + shop + purchases +
-  inventory, activation timing/restrictions, playoff shop, secret missions,
+  inventory, playoff shop, secret missions,
   tournament-wide events.
-- **Phase 3 (P3 — polish):** live dashboard, captain dashboard, activity/history view,
+- **Phase 3 (P3 — polish):** live dashboard, captain dashboard
   animations, mobile-friendly UI. *(Notifications out of scope.)*
 - **Phase D (Deploy — hosted infra):** stand up the hosted solution per §11's *Remote infra setup* —
   one-region VPC with split app/DB security groups, a private **RDS PostgreSQL** (`db.t4g.micro`,

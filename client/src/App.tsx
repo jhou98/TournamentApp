@@ -44,6 +44,17 @@ function RequireAuth({ children, roles }: { children: JSX.Element; roles?: Role[
   return children;
 }
 
+/** Signed-in only; also bounces non-admins away while the tournament's shop is hidden. */
+function RequireShopVisible({ children }: { children: JSX.Element }) {
+  const { profile, tournaments, activeTournamentId, loading } = useAuth();
+  if (loading) return <FullPageLoading />;
+  if (!profile) return <Navigate to="/login" replace />;
+  if (profile.role === "admin") return children;
+  const active = tournaments.find((t) => t.id === activeTournamentId);
+  if (!active?.shopVisible) return <Navigate to="/" replace />;
+  return children;
+}
+
 /** Login / signup: bounce already-authenticated users to Home. */
 function PublicOnly({ children }: { children: JSX.Element }) {
   const { profile, loading } = useAuth();
@@ -122,8 +133,22 @@ function Shell() {
         <Route path="leaderboard" element={<Leaderboard />} />
         <Route path="bounties" element={<Bounties />} />
 
-        <Route path="shop" element={<Shop />} />
-        <Route path="inventory" element={<Inventory />} />
+        <Route
+          path="shop"
+          element={
+            <RequireShopVisible>
+              <Shop />
+            </RequireShopVisible>
+          }
+        />
+        <Route
+          path="inventory"
+          element={
+            <RequireShopVisible>
+              <Inventory />
+            </RequireShopVisible>
+          }
+        />
 
         {/* Future phases — placeholders until the features ship (see lib/nav.ts). */}
         <Route path="missions" element={<ComingSoon />} />

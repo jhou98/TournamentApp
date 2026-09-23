@@ -60,6 +60,7 @@ function detail(): TournamentDetail {
     courtCount: 6,
     coinRule: DEFAULT_COIN_RULE,
     streakRule: DEFAULT_STREAK_RULE,
+    shopVisible: true,
   };
 }
 
@@ -108,6 +109,8 @@ function freshStores(): Stores {
         scoreAway: null,
         winnerPairId: null,
         status: "awaiting_lineups",
+        teamAPowerupUsedBy: null,
+        teamBPowerupUsedBy: null,
       });
     }
   }
@@ -122,12 +125,12 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
       return id === TID ? { ...stores.tournament } : null;
     },
     async list() {
-      const { id, name, status } = stores.tournament;
-      return [{ id, name, status }];
+      const { id, name, status, shopVisible } = stores.tournament;
+      return [{ id, name, status, shopVisible }];
     },
     async listByIds(ids) {
-      const { id, name, status } = stores.tournament;
-      return ids.includes(id) ? [{ id, name, status }] : [];
+      const { id, name, status, shopVisible } = stores.tournament;
+      return ids.includes(id) ? [{ id, name, status, shopVisible }] : [];
     },
     async create() {
       throw new Error("not used");
@@ -139,6 +142,9 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
       throw new Error("not used");
     },
     async updateRules() {
+      throw new Error("not used");
+    },
+    async setShopVisible() {
       throw new Error("not used");
     },
   };
@@ -360,6 +366,9 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
       return 0;
     },
     async deleteByTournament() {
+      throw new Error("not used");
+    },
+    async claimPowerupSlot() {
       throw new Error("not used");
     },
   };

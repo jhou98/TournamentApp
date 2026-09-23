@@ -12,6 +12,8 @@ const RECORD_SELECT = {
   scoreAway: true,
   winnerPairId: true,
   status: true,
+  teamAPowerupUsedBy: true,
+  teamBPowerupUsedBy: true,
 } as const;
 
 export function makePrismaGameRepo(): GameRepo {
@@ -79,6 +81,14 @@ export function makePrismaGameRepo(): GameRepo {
     },
     async deleteByTournament(tournamentId) {
       await getDb().game.deleteMany({ where: { matchup: { tournamentId } } });
+    },
+    async claimPowerupSlot(gameId, team, userId) {
+      const field = team === "A" ? "teamAPowerupUsedBy" : "teamBPowerupUsedBy";
+      const result = await getDb().game.updateMany({
+        where: { id: gameId, [field]: null },
+        data: { [field]: userId },
+      });
+      return result.count > 0;
     },
   };
 }

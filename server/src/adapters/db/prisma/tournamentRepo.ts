@@ -18,9 +18,10 @@ const DETAIL_SELECT = {
   courtCount: true,
   coinRule: true,
   streakRule: true,
+  shopVisible: true,
 } as const;
 
-const SUMMARY_SELECT = { id: true, name: true, status: true } as const;
+const SUMMARY_SELECT = { id: true, name: true, status: true, shopVisible: true } as const;
 
 type DetailRow = {
   id: string;
@@ -36,6 +37,7 @@ type DetailRow = {
   courtCount: number;
   coinRule: Prisma.JsonValue;
   streakRule: Prisma.JsonValue;
+  shopVisible: boolean;
 };
 
 const toDetail = (row: DetailRow): TournamentDetail => ({
@@ -91,6 +93,14 @@ export function makePrismaTournamentRepo(): TournamentRepo {
       if (patch.coinRule !== undefined) data.coinRule = patch.coinRule as unknown as Prisma.InputJsonValue;
       if (patch.streakRule !== undefined) data.streakRule = patch.streakRule as unknown as Prisma.InputJsonValue;
       const row = await getDb().tournament.update({ where: { id }, data, select: DETAIL_SELECT });
+      return toDetail(row);
+    },
+    async setShopVisible(id, visible) {
+      const row = await getDb().tournament.update({
+        where: { id },
+        data: { shopVisible: visible },
+        select: DETAIL_SELECT,
+      });
       return toDetail(row);
     },
   };
