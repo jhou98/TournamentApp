@@ -42,6 +42,8 @@ function detail(): TournamentDetail {
     coinRule: DEFAULT_COIN_RULE,
     streakRule: DEFAULT_STREAK_RULE,
     shopVisible: true,
+    potluckEventAt: null,
+    potluckAddress: null,
   };
 }
 
@@ -109,6 +111,9 @@ function buildService(stores: Stores): SuddenDeathService {
       throw new Error("not used");
     },
     async setShopVisible() {
+      throw new Error("not used");
+    },
+    async setPotluckDetails() {
       throw new Error("not used");
     },
   };

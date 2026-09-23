@@ -32,6 +32,9 @@ export interface TournamentDetail extends TournamentRef, TournamentConfig {
   coinRule: CoinRule;
   streakRule: StreakRule;
   shopVisible: boolean;
+  /** Potluck event details (admin-editable, null until set). */
+  potluckEventAt: Date | null;
+  potluckAddress: string | null;
 }
 
 /** Everything needed to create a tournament row (config + the rules JSON blobs). */
@@ -59,4 +62,9 @@ export interface TournamentRepo {
   ): Promise<TournamentDetail>;
   /** Toggle the Shop/Inventory pre-release flag — not locked to setup, unlike config. */
   setShopVisible(id: string, visible: boolean): Promise<TournamentDetail>;
+  /** Set the potluck event's date/time and address — not locked to setup. */
+  setPotluckDetails(
+    id: string,
+    patch: { eventAt: Date | null; address: string | null },
+  ): Promise<TournamentDetail>;
 }

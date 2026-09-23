@@ -26,6 +26,8 @@ function detailFrom(input: NewTournament, id: string): TournamentDetail {
     coinRule: coinRule as CoinRule,
     streakRule: streakRule as StreakRule,
     shopVisible: true,
+    potluckEventAt: null,
+    potluckAddress: null,
     ...config,
   };
 }
@@ -58,6 +60,9 @@ function fakeTournaments(seed: TournamentSummary[] = []): TournamentRepo & { sto
       throw new Error("not used");
     },
     async setShopVisible() {
+      throw new Error("not used");
+    },
+    async setPotluckDetails() {
       throw new Error("not used");
     },
   };

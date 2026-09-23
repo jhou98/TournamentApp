@@ -36,6 +36,8 @@ function tournamentDetail(): TournamentDetail {
     coinRule: DEFAULT_COIN_RULE,
     streakRule: DEFAULT_STREAK_RULE,
     shopVisible: true,
+    potluckEventAt: null,
+    potluckAddress: null,
   };
 }
 
@@ -62,6 +64,9 @@ const currentTournament: TournamentRepo = {
     throw new Error("not used");
   },
   async setShopVisible() {
+    throw new Error("not used");
+  },
+  async setPotluckDetails() {
     throw new Error("not used");
   },
 };

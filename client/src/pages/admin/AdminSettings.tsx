@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { orderRounds, type CoinRule, type EconomyRules, type ScheduleView, type StreakRule } from "../../lib/types";
+import { orderRounds, type CoinRule, type EconomyRules, type PotluckView, type ScheduleView, type StreakRule } from "../../lib/types";
 import { useToast } from "../../components/Toast";
 import { Alert, Button, Card, EmptyState, Field, InfoHint, Input, Select, StatusPill } from "../../components/ui";
 
@@ -95,6 +95,9 @@ export function AdminSettings() {
 
       {/* --- Shop visibility ------------------------------------------------ */}
       <ShopVisibilityCard />
+
+      {/* --- Potluck details ------------------------------------------------ */}
+      <PotluckSettingsCard />
 
       {/* --- Config -------------------------------------------------------- */}
       <Card
@@ -308,6 +311,81 @@ function ShopVisibilityCard() {
         <input type="checkbox" checked={active.shopVisible} disabled={busy} onChange={toggle} />
         <span className="font-semibold">Visible to captains/players</span>
       </label>
+    </Card>
+  );
+}
+
+/** Date/time/address for the potluck question shown on the Potluck page. */
+function PotluckSettingsCard() {
+  const { showToast } = useToast();
+  const [loaded, setLoaded] = useState(false);
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [address, setAddress] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    try {
+      const view = await api<PotluckView>("/potluck");
+      if (view.settings.eventAt) {
+        const d = new Date(view.settings.eventAt);
+        setDate(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        );
+        setTime(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+      } else {
+        setDate("");
+        setTime("");
+      }
+      setAddress(view.settings.address ?? "");
+    } finally {
+      setLoaded(true);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const eventAt = date && time ? new Date(`${date}T${time}`).toISOString() : null;
+      await api("/admin/tournament/potluck", {
+        method: "PATCH",
+        body: JSON.stringify({ eventAt, address: address.trim() || null }),
+      });
+      showToast("Potluck details saved.", "success");
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not save potluck details", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!loaded) return null;
+
+  return (
+    <Card className="mb-5" title="Potluck details" subtitle="Shown to everyone on the Potluck page.">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Date">
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Time">
+          <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </Field>
+        <Field label="Address">
+          <Input placeholder="123 Main St" value={address} maxLength={200} onChange={(e) => setAddress(e.target.value)} />
+        </Field>
+      </div>
+      <div className="mt-3">
+        <Button icon="check" disabled={busy} onClick={save}>
+          Save potluck details
+        </Button>
+      </div>
     </Card>
   );
 }

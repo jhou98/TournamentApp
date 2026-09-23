@@ -129,6 +129,9 @@ function buildService(stores: Stores): BountyService {
     async setShopVisible() {
       throw new Error("not used");
     },
+    async setPotluckDetails() {
+      throw new Error("not used");
+    },
   } satisfies TournamentRepo;
 
   const teams = {

@@ -101,6 +101,11 @@ const updatePowerupSchema = z
   .refine((v) => Object.keys(v).length > 0, { message: "Provide at least one field to update" });
 const resetCoinsSchema = z.object({ note: safeText({ min: 0, max: 200 }).optional() });
 const shopVisibilitySchema = z.object({ visible: z.boolean() });
+const potluckDetailsSchema = z.object({
+  // ISO datetime string, or null to clear it.
+  eventAt: z.coerce.date().nullable().optional(),
+  address: safeText({ min: 0, max: 200 }).nullable().optional(),
+});
 
 // Coin values feed per-game/streak ledger rows (a 32-bit int column) — bound
 // them to the same per-transaction cap so a rule can't overflow the ledger.
@@ -279,6 +284,21 @@ export function adminRouter(
       const { visible } = parse(shopVisibilitySchema, req.body);
       const tournament = await tournaments.setShopVisible(req.tournamentId!, visible);
       res.json({ shopVisible: tournament.shopVisible });
+    }),
+  );
+
+  router.patch(
+    "/tournament/potluck",
+    asyncHandler(async (req, res) => {
+      const patch = parse(potluckDetailsSchema, req.body);
+      const tournament = await tournaments.setPotluckDetails(req.tournamentId!, {
+        eventAt: patch.eventAt ?? null,
+        address: patch.address ?? null,
+      });
+      res.json({
+        eventAt: tournament.potluckEventAt ? tournament.potluckEventAt.toISOString() : null,
+        address: tournament.potluckAddress,
+      });
     }),
   );
 
