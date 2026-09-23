@@ -52,8 +52,8 @@ export function AppShell() {
 function Sidebar({ className }: { className?: string }) {
   const { profile, logout, tournaments, activeTournamentId, setActiveTournament } = useAuth();
   if (!profile) return null;
-  const items = visibleNav(profile.role);
   const active = tournaments.find((t) => t.id === activeTournamentId) ?? null;
+  const items = visibleNav(profile.role, active?.shopVisible ?? true);
 
   return (
     <aside

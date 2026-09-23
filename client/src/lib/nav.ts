@@ -12,6 +12,8 @@ export interface NavItem {
   comingSoon?: boolean;
   /** Short note shown on the placeholder page (which phase / stories deliver it). */
   phase?: string;
+  /** Hidden for non-admins while the active tournament's shopVisible flag is off. */
+  requiresShopVisible?: boolean;
 }
 
 /**
@@ -25,12 +27,16 @@ export const NAV: NavItem[] = [
   { to: "/captain", label: "Captain Panel", icon: "users", roles: ["captain", "admin"] },
   { to: "/leaderboard", label: "Leaderboard", icon: "coins" },
   { to: "/bounties", label: "Bounties", icon: "flag" },
-  { to: "/shop", label: "Shop", icon: "shop" },
-  { to: "/inventory", label: "Inventory", icon: "layers" },
+  { to: "/shop", label: "Shop", icon: "shop", requiresShopVisible: true },
+  { to: "/inventory", label: "Inventory", icon: "layers", requiresShopVisible: true },
   { to: "/missions", label: "Missions", icon: "target", comingSoon: true, phase: "Phase 2 · commissioner (US23–US24)" },
   { to: "/admin", label: "Admin Panel", icon: "shield", roles: ["admin"] },
 ];
 
-export function visibleNav(role: Role): NavItem[] {
-  return NAV.filter((item) => !item.roles || item.roles.includes(role));
+export function visibleNav(role: Role, shopVisible: boolean): NavItem[] {
+  return NAV.filter((item) => {
+    if (item.roles && !item.roles.includes(role)) return false;
+    if (item.requiresShopVisible && role !== "admin" && !shopVisible) return false;
+    return true;
+  });
 }

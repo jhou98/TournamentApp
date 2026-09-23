@@ -14,7 +14,7 @@ import type {
 } from "../../src/ports/index.js";
 
 function summary(id: string, name = id): TournamentSummary {
-  return { id, name, status: "setup" };
+  return { id, name, status: "setup", shopVisible: true };
 }
 
 function detailFrom(input: NewTournament, id: string): TournamentDetail {
@@ -25,6 +25,7 @@ function detailFrom(input: NewTournament, id: string): TournamentDetail {
     status: "setup",
     coinRule: coinRule as CoinRule,
     streakRule: streakRule as StreakRule,
+    shopVisible: true,
     ...config,
   };
 }
@@ -54,6 +55,9 @@ function fakeTournaments(seed: TournamentSummary[] = []): TournamentRepo & { sto
       throw new Error("not used");
     },
     async updateRules() {
+      throw new Error("not used");
+    },
+    async setShopVisible() {
       throw new Error("not used");
     },
   };

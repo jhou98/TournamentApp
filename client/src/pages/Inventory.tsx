@@ -3,21 +3,44 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { InventoryItemView } from "../lib/types";
 import { Icon } from "../components/Icon";
-import { Alert, Card, EmptyState, Loading, PageHeader } from "../components/ui";
+import { useToast } from "../components/Toast";
+import { Alert, Button, Card, EmptyState, Loading, PageHeader } from "../components/ui";
 
-/** A player's owned powerups (US20). No activation/used state yet (US21+). */
+/** A player's owned powerups (US20), with the ability to use one (US21). */
 export function Inventory() {
   const { activeTournamentId } = useAuth();
+  const { showToast } = useToast();
   const [items, setItems] = useState<InventoryItemView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [usingId, setUsingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
     setError(null);
-    setItems(null);
     api<{ inventory: InventoryItemView[] }>("/shop/inventory")
       .then((d) => setItems(d.inventory))
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
+  }
+
+  useEffect(() => {
+    setItems(null);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTournamentId]);
+
+  async function use(item: InventoryItemView) {
+    if (usingId) return;
+    if (!window.confirm(`Use "${item.name}" now? This can't be undone.`)) return;
+    setUsingId(item.id);
+    try {
+      await api(`/shop/inventory/${item.id}/use`, { method: "POST" });
+      showToast(`Used ${item.name}.`, "success");
+      setItems((cur) => cur?.filter((x) => x.id !== item.id) ?? cur);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not use powerup", "error");
+    } finally {
+      setUsingId(null);
+    }
+  }
 
   return (
     <>
@@ -47,6 +70,17 @@ export function Inventory() {
               <p className="mt-2 text-xs text-ink-faint">
                 Bought {new Date(i.purchasedAt).toLocaleDateString()}
               </p>
+              <div className="mt-3">
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  icon="bolt"
+                  disabled={usingId === i.id}
+                  onClick={() => use(i)}
+                >
+                  Use
+                </Button>
+              </div>
             </Card>
           ))}
         </div>

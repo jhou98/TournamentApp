@@ -12,6 +12,8 @@ export interface TournamentSummary {
   id: string;
   name: string;
   status: "setup" | "round_robin" | "playoffs" | "completed";
+  /** Pre-release flag: whether captains/players can see the Shop/Inventory (admins always can). */
+  shopVisible: boolean;
 }
 
 export interface Profile {

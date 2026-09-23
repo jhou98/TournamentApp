@@ -36,6 +36,8 @@ export interface TournamentService {
    */
   resolveActive(user: PublicUser, requestedId?: string | null): Promise<string | null>;
   create(user: PublicUser, input: CreateTournamentInput): Promise<TournamentDetail>;
+  /** Toggle the Shop/Inventory pre-release flag for captains/players (admins always see it). */
+  setShopVisible(tournamentId: string, visible: boolean): Promise<TournamentDetail>;
 }
 
 export function makeTournamentService(deps: TournamentServiceDeps): TournamentService {
@@ -84,6 +86,10 @@ export function makeTournamentService(deps: TournamentServiceDeps): TournamentSe
         streakRule: DEFAULT_STREAK_RULE,
         suddenDeathRule: DEFAULT_SUDDEN_DEATH_RULE,
       });
+    },
+
+    async setShopVisible(tournamentId, visible) {
+      return deps.tournaments.setShopVisible(tournamentId, visible);
     },
   };
 }

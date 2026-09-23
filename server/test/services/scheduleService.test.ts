@@ -46,6 +46,7 @@ function defaultDetail(overrides: Partial<TournamentDetail> = {}): TournamentDet
     courtCount: 6,
     coinRule: DEFAULT_COIN_RULE,
     streakRule: DEFAULT_STREAK_RULE,
+    shopVisible: true,
     ...overrides,
   };
 }
@@ -69,12 +70,12 @@ function buildService(stores: Stores): ScheduleService {
       return id === stores.tournament.id ? { ...stores.tournament } : null;
     },
     async list() {
-      const { id, name, status } = stores.tournament;
-      return [{ id, name, status }];
+      const { id, name, status, shopVisible } = stores.tournament;
+      return [{ id, name, status, shopVisible }];
     },
     async listByIds(ids) {
-      const { id, name, status } = stores.tournament;
-      return ids.includes(id) ? [{ id, name, status }] : [];
+      const { id, name, status, shopVisible } = stores.tournament;
+      return ids.includes(id) ? [{ id, name, status, shopVisible }] : [];
     },
     async create() {
       throw new Error("not used");
@@ -87,6 +88,9 @@ function buildService(stores: Stores): ScheduleService {
       return { ...stores.tournament };
     },
     async updateRules() {
+      throw new Error("not used");
+    },
+    async setShopVisible() {
       throw new Error("not used");
     },
   };
@@ -199,6 +203,8 @@ function buildService(stores: Stores): ScheduleService {
           scoreHome: null,
           scoreAway: null,
           winnerPairId: null,
+          teamAPowerupUsedBy: null,
+          teamBPowerupUsedBy: null,
           ...g,
         });
       }
@@ -250,6 +256,9 @@ function buildService(stores: Stores): ScheduleService {
     },
     async deleteByTournament(tournamentId) {
       stores.games = stores.games.filter((g) => matchupTournament(g.matchupId) !== tournamentId);
+    },
+    async claimPowerupSlot() {
+      throw new Error("not used");
     },
   };
 

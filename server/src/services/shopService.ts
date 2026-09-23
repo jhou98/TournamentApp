@@ -1,19 +1,41 @@
 /**
- * Player-facing shop (US20, scoped down for now): browse the powerup catalog,
- * buy one with coins, and see what's already owned. A player can own at most
- * one of each powerup — an owned powerup isn't buyable again. No activation
- * timing or "used" state yet (US21+).
+ * Player-facing shop (US20/US21, scoped down for now): browse the powerup
+ * catalog, buy one with coins, see what's owned, and use one. A player can
+ * own at most one *active* copy of a given powerup at a time — using it
+ * deletes the purchase (consumed for good, free to rebuy) and claims that
+ * game's "one powerup per team" slot instead. No activation window yet.
  */
 
-import { NotFoundError, ValidationError } from "../domain/errors.js";
-import type { CoinLedgerRepo, PowerupRepo, PurchaseRecord, PurchaseRepo, UnitOfWork } from "../ports/index.js";
+import { ForbiddenError, NotFoundError, ValidationError } from "../domain/errors.js";
+import type {
+  CoinLedgerRepo,
+  GameRecord,
+  GameRepo,
+  LineupRepo,
+  MatchupRepo,
+  MembershipRepo,
+  PowerupRepo,
+  PublicUser,
+  PurchaseRecord,
+  PurchaseRepo,
+  TournamentRepo,
+  UnitOfWork,
+} from "../ports/index.js";
 
 export interface ShopServiceDeps {
   powerups: PowerupRepo;
   purchases: PurchaseRepo;
   coinLedger: CoinLedgerRepo;
+  memberships: MembershipRepo;
+  games: GameRepo;
+  matchups: MatchupRepo;
+  lineups: LineupRepo;
+  tournaments: TournamentRepo;
   uow: UnitOfWork;
 }
+
+/** Chronological ordering for "current game" lookup: stage, then round, then id. */
+const STAGE_RANK: Record<string, number> = { round_robin: 0, semifinal: 1, final: 2 };
 
 /** A catalog powerup as a player sees it: buyable, or already owned. */
 export interface ShopPowerupView {
@@ -39,18 +61,87 @@ export interface PurchaseResult {
   balance: number;
 }
 
+/** The result of using a powerup: which one, and which game it was applied to. */
+export interface UsePowerupResult {
+  powerupId: string;
+  name: string;
+  gameId: string;
+}
+
 export interface ShopService {
-  listForUser(tournamentId: string, userId: string): Promise<ShopPowerupView[]>;
-  listInventory(tournamentId: string, userId: string): Promise<InventoryItemView[]>;
-  purchase(tournamentId: string, userId: string, powerupId: string): Promise<PurchaseResult>;
+  listForUser(tournamentId: string, user: PublicUser): Promise<ShopPowerupView[]>;
+  listInventory(tournamentId: string, user: PublicUser): Promise<InventoryItemView[]>;
+  purchase(tournamentId: string, user: PublicUser, powerupId: string): Promise<PurchaseResult>;
+  /**
+   * Use an owned powerup (US21, scoped down — no activation window yet). Auto-
+   * detects "the current game": the player's own earliest assigned-but-unscored
+   * game. Claims that game's one-per-team slot (race-safe) and consumes the
+   * purchase for good — the player is free to buy another copy later.
+   */
+  use(tournamentId: string, user: PublicUser, purchaseId: string): Promise<UsePowerupResult>;
 }
 
 export function makeShopService(deps: ShopServiceDeps): ShopService {
+  /**
+   * Pre-release gate: captains/players are blocked while a tournament's
+   * shopVisible flag is off. Admins always pass through.
+   */
+  async function requireVisible(tournamentId: string, user: PublicUser): Promise<void> {
+    if (user.isAdmin) return;
+    const t = await deps.tournaments.getDetail(tournamentId);
+    if (!t || !t.shopVisible) throw new ForbiddenError("The shop isn't open yet");
+  }
+
+  /** The player's own earliest assigned-but-unscored game, and which side ("A"/"B") their team is. */
+  async function findCurrentGame(
+    tournamentId: string,
+    userId: string,
+    teamId: string,
+  ): Promise<{ game: GameRecord; team: "A" | "B" } | null> {
+    const lineups = await deps.lineups.listByTeam(teamId);
+    const myPairIds = new Set(
+      lineups.flatMap((l) => l.pairs.filter((p) => p.playerIds.includes(userId)).map((p) => p.id)),
+    );
+    if (myPairIds.size === 0) return null;
+
+    const [games, matchups] = await Promise.all([
+      deps.games.listByTournament(tournamentId),
+      deps.matchups.listByTournament(tournamentId),
+    ]);
+    const matchupById = new Map(matchups.map((m) => [m.id, m]));
+
+    const candidates = games
+      .filter(
+        (g) =>
+          g.status === "assigned" &&
+          ((g.homePairId && myPairIds.has(g.homePairId)) || (g.awayPairId && myPairIds.has(g.awayPairId))),
+      )
+      .map((g) => ({ game: g, matchup: matchupById.get(g.matchupId) }))
+      .filter((c): c is { game: GameRecord; matchup: NonNullable<typeof c.matchup> } => !!c.matchup);
+
+    if (candidates.length === 0) return null;
+
+    candidates.sort((a, b) => {
+      const stageDiff = (STAGE_RANK[a.matchup.stage] ?? 0) - (STAGE_RANK[b.matchup.stage] ?? 0);
+      if (stageDiff !== 0) return stageDiff;
+      const roundDiff = (a.matchup.roundIndex ?? 0) - (b.matchup.roundIndex ?? 0);
+      if (roundDiff !== 0) return roundDiff;
+      const roundNoDiff = a.game.roundNo - b.game.roundNo;
+      if (roundNoDiff !== 0) return roundNoDiff;
+      return a.game.id < b.game.id ? -1 : a.game.id > b.game.id ? 1 : 0;
+    });
+
+    const best = candidates[0]!;
+    const team: "A" | "B" = best.matchup.teamAId === teamId ? "A" : "B";
+    return { game: best.game, team };
+  }
+
   return {
-    async listForUser(tournamentId, userId) {
+    async listForUser(tournamentId, user) {
+      await requireVisible(tournamentId, user);
       const [catalog, owned] = await Promise.all([
         deps.powerups.listByTournament(tournamentId),
-        deps.purchases.listByUser(tournamentId, userId),
+        deps.purchases.listByUser(tournamentId, user.id),
       ]);
       const ownedPowerupIds = new Set(owned.map((p) => p.powerupId));
       return catalog.map((p) => ({
@@ -62,8 +153,9 @@ export function makeShopService(deps: ShopServiceDeps): ShopService {
       }));
     },
 
-    async listInventory(tournamentId, userId) {
-      const owned = await deps.purchases.listByUser(tournamentId, userId);
+    async listInventory(tournamentId, user) {
+      await requireVisible(tournamentId, user);
+      const owned = await deps.purchases.listByUser(tournamentId, user.id);
       const items: InventoryItemView[] = [];
       for (const purchase of owned) {
         const powerup = await deps.powerups.findById(purchase.powerupId);
@@ -80,7 +172,9 @@ export function makeShopService(deps: ShopServiceDeps): ShopService {
       return items;
     },
 
-    async purchase(tournamentId, userId, powerupId) {
+    async purchase(tournamentId, user, powerupId) {
+      await requireVisible(tournamentId, user);
+      const userId = user.id;
       const powerup = await deps.powerups.findById(powerupId);
       if (!powerup || powerup.tournamentId !== tournamentId) {
         throw new NotFoundError("Powerup not found");
@@ -122,6 +216,36 @@ export function makeShopService(deps: ShopServiceDeps): ShopService {
         },
         balance: newBalance,
       };
+    },
+
+    async use(tournamentId, user, purchaseId) {
+      await requireVisible(tournamentId, user);
+      const userId = user.id;
+      const purchase = await deps.purchases.findById(purchaseId);
+      if (!purchase || purchase.tournamentId !== tournamentId || purchase.userId !== userId) {
+        throw new NotFoundError("Powerup not found in your inventory");
+      }
+
+      const membership = await deps.memberships.findByUserAndTournament(userId, tournamentId);
+      if (!membership) throw new NotFoundError("You are not part of this tournament");
+
+      const current = await findCurrentGame(tournamentId, userId, membership.teamId);
+      if (!current) {
+        throw new ValidationError("You don't have a game in progress to use a powerup on right now");
+      }
+
+      const powerup = await deps.powerups.findById(purchase.powerupId);
+
+      let claimed = false;
+      await deps.uow.run(async () => {
+        claimed = await deps.games.claimPowerupSlot(current.game.id, current.team, userId);
+        if (!claimed) return;
+        await deps.purchases.delete(purchase.id);
+      });
+
+      if (!claimed) throw new ValidationError("Your team has already used a powerup in this game");
+
+      return { powerupId: purchase.powerupId, name: powerup?.name ?? "Powerup", gameId: current.game.id };
     },
   };
 }

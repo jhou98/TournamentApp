@@ -18,22 +18,30 @@ export function shopRouter(
   router.get(
     "/",
     asyncHandler(async (req, res) => {
-      res.json({ powerups: await shop.listForUser(req.tournamentId!, req.user!.id) });
+      res.json({ powerups: await shop.listForUser(req.tournamentId!, req.user!) });
     }),
   );
 
   router.get(
     "/inventory",
     asyncHandler(async (req, res) => {
-      res.json({ inventory: await shop.listInventory(req.tournamentId!, req.user!.id) });
+      res.json({ inventory: await shop.listInventory(req.tournamentId!, req.user!) });
     }),
   );
 
   router.post(
     "/:powerupId/buy",
     asyncHandler(async (req, res) => {
-      const result = await shop.purchase(req.tournamentId!, req.user!.id, requireParam(req, "powerupId"));
+      const result = await shop.purchase(req.tournamentId!, req.user!, requireParam(req, "powerupId"));
       res.status(201).json(result);
+    }),
+  );
+
+  router.post(
+    "/inventory/:purchaseId/use",
+    asyncHandler(async (req, res) => {
+      const result = await shop.use(req.tournamentId!, req.user!, requireParam(req, "purchaseId"));
+      res.json(result);
     }),
   );
 
