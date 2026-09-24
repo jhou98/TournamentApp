@@ -208,8 +208,6 @@ function buildService(stores: Stores): ScheduleService {
           scoreHome: null,
           scoreAway: null,
           winnerPairId: null,
-          teamAPowerupUsedBy: null,
-          teamBPowerupUsedBy: null,
           ...g,
         });
       }
@@ -261,9 +259,6 @@ function buildService(stores: Stores): ScheduleService {
     },
     async deleteByTournament(tournamentId) {
       stores.games = stores.games.filter((g) => matchupTournament(g.matchupId) !== tournamentId);
-    },
-    async claimPowerupSlot() {
-      throw new Error("not used");
     },
   };
 

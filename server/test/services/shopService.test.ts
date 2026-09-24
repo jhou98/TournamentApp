@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { makeShopService, type ShopService } from "../../src/services/shopService.js";
 import type {
   CoinLedgerRepo,
+  GamePowerupUseRepo,
   GameRecord,
   GameRepo,
   LineupRepo,
@@ -43,6 +44,8 @@ interface Stores {
   games: GameRecord[];
   matchups: MatchupView[];
   lineups: LineupWithPairs[];
+  /** Claimed (gameId, userId) powerup-use slots. */
+  gamePowerupUses: Set<string>;
   shopVisible: boolean;
   seq: number;
 }
@@ -57,6 +60,7 @@ function freshStores(balance = 100): Stores {
     games: [],
     matchups: [],
     lineups: [],
+    gamePowerupUses: new Set(),
     shopVisible: true,
     seq: 0,
   };
@@ -114,8 +118,6 @@ function seedCurrentGame(stores: Stores, gameOverrides: Partial<GameRecord> = {}
     scoreAway: null,
     winnerPairId: null,
     status: "assigned",
-    teamAPowerupUsedBy: null,
-    teamBPowerupUsedBy: null,
     ...gameOverrides,
   };
   stores.games.push(game);
@@ -262,12 +264,13 @@ function buildService(stores: Stores): ShopService {
     async deleteByTournament() {
       throw new Error("not used");
     },
-    async claimPowerupSlot(gameId, team, userId) {
-      const g = stores.games.find((x) => x.id === gameId);
-      if (!g) return false;
-      const field = team === "A" ? "teamAPowerupUsedBy" : "teamBPowerupUsedBy";
-      if (g[field] !== null) return false;
-      g[field] = userId;
+  };
+
+  const gamePowerupUses: GamePowerupUseRepo = {
+    async claim(gameId, userId) {
+      const key = `${gameId}:${userId}`;
+      if (stores.gamePowerupUses.has(key)) return false;
+      stores.gamePowerupUses.add(key);
       return true;
     },
   };
@@ -363,7 +366,18 @@ function buildService(stores: Stores): ShopService {
     },
   };
 
-  return makeShopService({ powerups, purchases, coinLedger, memberships, games, matchups, lineups, tournaments, uow: passthroughUow });
+  return makeShopService({
+    powerups,
+    purchases,
+    coinLedger,
+    memberships,
+    games,
+    gamePowerupUses,
+    matchups,
+    lineups,
+    tournaments,
+    uow: passthroughUow,
+  });
 }
 
 function seedPowerup(stores: Stores, cost: number, name = "Extra Serve"): PowerupRecord {
@@ -477,7 +491,7 @@ describe("shopService.use", () => {
     service = buildService(stores);
   });
 
-  it("uses a powerup, claims the team's slot on the current game, and consumes the purchase", async () => {
+  it("uses a powerup, claims the player's own slot on the current game, and consumes the purchase", async () => {
     const game = seedCurrentGame(stores);
     const p = seedPowerup(stores, 10, "Extra Serve");
     const bought = await service.purchase(TID, user(UID), p.id);
@@ -486,7 +500,7 @@ describe("shopService.use", () => {
 
     expect(result).toMatchObject({ powerupId: p.id, name: "Extra Serve", gameId: game.id });
     expect(stores.purchases).toHaveLength(0); // consumed
-    expect(stores.games.find((g) => g.id === game.id)?.teamAPowerupUsedBy).toBe(UID);
+    expect(stores.gamePowerupUses.has(`${game.id}:${UID}`)).toBe(true);
   });
 
   it("frees the slot to rebuy the same powerup after use", async () => {
@@ -498,7 +512,20 @@ describe("shopService.use", () => {
     await expect(service.purchase(TID, user(UID), p.id)).resolves.toMatchObject({ purchase: { powerupId: p.id } });
   });
 
-  it("refuses a second teammate from using a powerup in the same game", async () => {
+  it("refuses the same player from using a second powerup in the same game", async () => {
+    seedCurrentGame(stores);
+    const p1 = seedPowerup(stores, 10, "A");
+    const p2 = seedPowerup(stores, 10, "B");
+    const bought1 = await service.purchase(TID, user(UID), p1.id);
+    await service.use(TID, user(UID), bought1.purchase.id);
+
+    const bought2 = await service.purchase(TID, user(UID), p2.id);
+    await expect(service.use(TID, user(UID), bought2.purchase.id)).rejects.toThrow(/already used/i);
+    // The second purchase is untouched since the use failed.
+    expect(stores.purchases.some((x) => x.id === bought2.purchase.id)).toBe(true);
+  });
+
+  it("lets a teammate use their own powerup in the same game independently", async () => {
     seedCurrentGame(stores);
     const p1 = seedPowerup(stores, 10, "A");
     const p2 = seedPowerup(stores, 10, "B");
@@ -506,12 +533,10 @@ describe("shopService.use", () => {
     await service.use(TID, user(UID), bought1.purchase.id);
 
     const bought2 = await service.purchase(TID, user(MATE), p2.id);
-    await expect(service.use(TID, user(MATE), bought2.purchase.id)).rejects.toThrow(/already used/i);
-    // The teammate's purchase is untouched since the use failed.
-    expect(stores.purchases.some((x) => x.id === bought2.purchase.id)).toBe(true);
+    await expect(service.use(TID, user(MATE), bought2.purchase.id)).resolves.toMatchObject({ powerupId: p2.id });
   });
 
-  it("does not block the opposing team's slot", async () => {
+  it("lets a player on the opposing team use their own powerup independently", async () => {
     seedCurrentGame(stores);
     const p1 = seedPowerup(stores, 10, "A");
     const p2 = seedPowerup(stores, 10, "B");

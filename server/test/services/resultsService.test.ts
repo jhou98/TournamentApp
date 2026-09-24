@@ -91,8 +91,6 @@ function freshStores(): Stores {
         scoreAway: null,
         winnerPairId: null,
         status: "assigned",
-        teamAPowerupUsedBy: null,
-        teamBPowerupUsedBy: null,
       });
     }
   }
@@ -321,9 +319,6 @@ function buildService(stores: Stores): ResultsService {
       return 0;
     },
     async deleteByTournament() {
-      throw new Error("not used");
-    },
-    async claimPowerupSlot() {
       throw new Error("not used");
     },
   };

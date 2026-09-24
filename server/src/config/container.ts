@@ -16,6 +16,7 @@ import { makePrismaBountyRepo } from "../adapters/db/prisma/bountyRepo.js";
 import { makePrismaPowerupRepo } from "../adapters/db/prisma/powerupRepo.js";
 import { makePrismaPurchaseRepo } from "../adapters/db/prisma/purchaseRepo.js";
 import { makePrismaPotluckRsvpRepo } from "../adapters/db/prisma/potluckRsvpRepo.js";
+import { makePrismaGamePowerupUseRepo } from "../adapters/db/prisma/gamePowerupUseRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -76,6 +77,7 @@ export function buildContainer(env: Env): Container {
   const powerupRepo = makePrismaPowerupRepo();
   const purchaseRepo = makePrismaPurchaseRepo();
   const potluckRsvpRepo = makePrismaPotluckRsvpRepo();
+  const gamePowerupUseRepo = makePrismaGamePowerupUseRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -156,6 +158,7 @@ export function buildContainer(env: Env): Container {
     coinLedger,
     memberships,
     games: gamesRepo,
+    gamePowerupUses: gamePowerupUseRepo,
     matchups,
     lineups,
     tournaments,

@@ -76,6 +76,7 @@ model User {
   coinTransactions CoinTransaction[]
   purchases        Purchase[]
   potluckRsvps     PotluckRsvp[]
+  gamePowerupUses  GamePowerupUse[]
 
   @@map("user")
 }
@@ -265,22 +266,34 @@ model Game {
   finalizedBy  String?
   finalizedAt  DateTime?
   createdAt    DateTime   @default(now())
-  // The "one powerup per team per game" slot (US21, scoped down — no
-  // activation window yet). Null = unused; set to the userId who used it,
-  // keyed to the matchup's teamA/teamB. Using a powerup deletes the Purchase
-  // (consumed for good, free to rebuy) and claims this slot instead, locking
-  // out every other player on that team for the rest of the game.
-  teamAPowerupUsedBy String?
-  teamBPowerupUsedBy String?
 
-  matchup    Matchup @relation(fields: [matchupId], references: [id])
-  court      Court?  @relation(fields: [courtId], references: [id])
-  homePair   Pair?   @relation("GameHomePair", fields: [homePairId], references: [id])
-  awayPair   Pair?   @relation("GameAwayPair", fields: [awayPairId], references: [id])
-  winnerPair Pair?   @relation("GameWinnerPair", fields: [winnerPairId], references: [id])
-  finalizer  User?   @relation("GameFinalizedBy", fields: [finalizedBy], references: [id])
+  matchup     Matchup          @relation(fields: [matchupId], references: [id])
+  court       Court?           @relation(fields: [courtId], references: [id])
+  homePair    Pair?            @relation("GameHomePair", fields: [homePairId], references: [id])
+  awayPair    Pair?            @relation("GameAwayPair", fields: [awayPairId], references: [id])
+  winnerPair  Pair?            @relation("GameWinnerPair", fields: [winnerPairId], references: [id])
+  finalizer   User?            @relation("GameFinalizedBy", fields: [finalizedBy], references: [id])
+  powerupUses GamePowerupUse[]
 
   @@map("game")
+}
+
+// The "one powerup per player per game" slot (US21, scoped down — no
+// activation window yet). One row claims a player's own slot for a game —
+// up to one per player, so a doubles game can see as many powerups used as
+// it has players. Using a powerup deletes the Purchase (consumed for good,
+// free to rebuy) and inserts this row instead.
+model GamePowerupUse {
+  id        String   @id @default(cuid())
+  gameId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, userId])
+  @@map("game_powerup_use")
 }
 
 model SuddenDeath {
