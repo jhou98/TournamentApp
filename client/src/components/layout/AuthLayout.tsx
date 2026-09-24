@@ -22,9 +22,9 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           className="pointer-events-none absolute -right-28 -top-20 rotate-12 opacity-10"
         />
         <div className="relative z-10 flex flex-col items-center px-10 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest text-amber">Friends</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-amber">6th Annual</span>
           <h1 className="mt-3 text-5xl font-extrabold uppercase leading-tight text-white sm:text-6xl">
-            Thanksgiving
+            Friendsgiving
           </h1>
           <div className="text-4xl font-extrabold uppercase leading-tight text-pine-text sm:text-5xl">
             Tournament
