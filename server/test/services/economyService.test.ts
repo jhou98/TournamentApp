@@ -81,8 +81,6 @@ function freshStores(): Stores {
       scoreAway: 10,
       winnerPairId: "pa1",
       status: "final",
-      teamAPowerupUsedBy: null,
-      teamBPowerupUsedBy: null,
     },
     {
       id: "g2",
@@ -95,8 +93,6 @@ function freshStores(): Stores {
       scoreAway: 21,
       winnerPairId: "pb1",
       status: "final",
-      teamAPowerupUsedBy: null,
-      teamBPowerupUsedBy: null,
     },
     // Not final -> ignored.
     {
@@ -110,8 +106,6 @@ function freshStores(): Stores {
       scoreAway: null,
       winnerPairId: null,
       status: "assigned",
-      teamAPowerupUsedBy: null,
-      teamBPowerupUsedBy: null,
     },
   ];
 
@@ -221,9 +215,6 @@ function buildService(stores: Stores): EconomyService {
       return 0;
     },
     async deleteByTournament() {
-      throw new Error("not used");
-    },
-    async claimPowerupSlot() {
       throw new Error("not used");
     },
   };

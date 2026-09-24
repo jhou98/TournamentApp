@@ -111,8 +111,6 @@ function freshStores(): Stores {
         scoreAway: null,
         winnerPairId: null,
         status: "awaiting_lineups",
-        teamAPowerupUsedBy: null,
-        teamBPowerupUsedBy: null,
       });
     }
   }
@@ -371,9 +369,6 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
       return 0;
     },
     async deleteByTournament() {
-      throw new Error("not used");
-    },
-    async claimPowerupSlot() {
       throw new Error("not used");
     },
   };

@@ -17,9 +17,6 @@ export interface GameRecord {
   scoreAway: number | null;
   winnerPairId: string | null;
   status: GameStatus;
-  /** The "one powerup per team per game" slot (US21) — null until a team uses one. */
-  teamAPowerupUsedBy: string | null;
-  teamBPowerupUsedBy: string | null;
 }
 
 export interface PairAssignmentInput {
@@ -51,10 +48,4 @@ export interface GameRepo {
   /** Count games in a given status across the tournament (guards reset/regenerate). */
   countByStatus(tournamentId: string, status: GameStatus): Promise<number>;
   deleteByTournament(tournamentId: string): Promise<void>;
-  /**
-   * Atomically claim a team's powerup slot for a game (US21) if it's still
-   * free — race-safe (two teammates hitting Use at once can't both win the
-   * slot). Returns false if the slot was already claimed.
-   */
-  claimPowerupSlot(gameId: string, team: "A" | "B", userId: string): Promise<boolean>;
 }

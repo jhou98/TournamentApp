@@ -54,3 +54,4 @@ export type { BountyRepo, BountyRecord, NewBounty, BountyTargetType } from "./Bo
 export type { PowerupRepo, PowerupRecord, NewPowerup, PowerupUpdate } from "./PowerupRepo.js";
 export type { PurchaseRepo, PurchaseRecord, NewPurchase } from "./PurchaseRepo.js";
 export type { PotluckRsvpRepo, PotluckRsvpRecord, UpsertPotluckRsvp } from "./PotluckRsvpRepo.js";
+export type { GamePowerupUseRepo } from "./GamePowerupUseRepo.js";

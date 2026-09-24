@@ -80,8 +80,6 @@ function rrGame(matchupId: string, scoreHome: number, scoreAway: number): GameRe
     scoreAway,
     winnerPairId: "ph",
     status: "final",
-    teamAPowerupUsedBy: null,
-    teamBPowerupUsedBy: null,
   };
 }
 
@@ -204,8 +202,6 @@ function buildService(stores: Stores): PlayoffsService {
           scoreAway: null,
           winnerPairId: null,
           status: "awaiting_lineups",
-          teamAPowerupUsedBy: null,
-          teamBPowerupUsedBy: null,
           ...g,
         });
       }
@@ -235,9 +231,6 @@ function buildService(stores: Stores): PlayoffsService {
       return 0;
     },
     async deleteByTournament() {
-      throw new Error("not used");
-    },
-    async claimPowerupSlot() {
       throw new Error("not used");
     },
   };

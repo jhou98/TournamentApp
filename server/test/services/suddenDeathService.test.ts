@@ -75,8 +75,8 @@ function tiedFinal(stage: MatchupRecord["stage"] = "final"): Stores {
     winnerTeamId: null,
   };
   const games: GameRecord[] = [
-    { id: "g1", matchupId: MID, roundNo: 1, courtId: "c1", homePairId: "ph1", awayPairId: "pa1", scoreHome: 21, scoreAway: 10, winnerPairId: "ph1", status: "final", teamAPowerupUsedBy: null, teamBPowerupUsedBy: null },
-    { id: "g2", matchupId: MID, roundNo: 2, courtId: "c1", homePairId: "ph2", awayPairId: "pa2", scoreHome: 10, scoreAway: 21, winnerPairId: "pa2", status: "final", teamAPowerupUsedBy: null, teamBPowerupUsedBy: null },
+    { id: "g1", matchupId: MID, roundNo: 1, courtId: "c1", homePairId: "ph1", awayPairId: "pa1", scoreHome: 21, scoreAway: 10, winnerPairId: "ph1", status: "final" },
+    { id: "g2", matchupId: MID, roundNo: 2, courtId: "c1", homePairId: "ph2", awayPairId: "pa2", scoreHome: 10, scoreAway: 21, winnerPairId: "pa2", status: "final" },
   ];
   const memberships: MembershipRecord[] = [
     { id: "m-a1", userId: "a1", teamId: TA, tournamentId: TID, role: "captain", createdAt: new Date() },
@@ -232,9 +232,6 @@ function buildService(stores: Stores): SuddenDeathService {
       return 0;
     },
     async deleteByTournament() {
-      throw new Error("not used");
-    },
-    async claimPowerupSlot() {
       throw new Error("not used");
     },
   };
