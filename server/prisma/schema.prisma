@@ -78,6 +78,7 @@ model User {
   purchases        Purchase[]
   potluckRsvps     PotluckRsvp[]
   gamePowerupUses  GamePowerupUse[]
+  missions         Mission[]
 
   @@map("user")
 }
@@ -132,6 +133,7 @@ model Tournament {
   powerups         Powerup[]
   purchases        Purchase[]
   potluckRsvps     PotluckRsvp[]
+  missions         Mission[]
 
   @@map("tournament")
 }
@@ -423,4 +425,24 @@ model PotluckRsvp {
 
   @@unique([tournamentId, userId])
   @@map("potluck_rsvp")
+}
+
+// A mission an admin writes and assigns to one player (US23, scoped down —
+// no auto coin credit, expiration, or status tracking yet). The player
+// completes it in person and shows the commissioner, who awards coins
+// manually via the existing coin-adjustment tool; "complete" here just
+// deletes the mission from the player's list.
+model Mission {
+  id           String   @id @default(cuid())
+  tournamentId String
+  userId       String
+  description  String
+  prize        String
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId, userId])
+  @@map("mission")
 }

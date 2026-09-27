@@ -17,6 +17,7 @@ import { makePrismaPowerupRepo } from "../adapters/db/prisma/powerupRepo.js";
 import { makePrismaPurchaseRepo } from "../adapters/db/prisma/purchaseRepo.js";
 import { makePrismaPotluckRsvpRepo } from "../adapters/db/prisma/potluckRsvpRepo.js";
 import { makePrismaGamePowerupUseRepo } from "../adapters/db/prisma/gamePowerupUseRepo.js";
+import { makePrismaMissionRepo } from "../adapters/db/prisma/missionRepo.js";
 import { makeBcryptHasher } from "../adapters/security/bcryptHasher.js";
 import { makeJwtTokenService } from "../adapters/security/jwtTokenService.js";
 import { makeAuthMiddleware, type AuthMiddleware } from "../adapters/http/express/middleware/auth.js";
@@ -32,6 +33,7 @@ import { makeBountyService, type BountyService } from "../services/bountyService
 import { makePowerupService, type PowerupService } from "../services/powerupService.js";
 import { makeShopService, type ShopService } from "../services/shopService.js";
 import { makePotluckService, type PotluckService } from "../services/potluckService.js";
+import { makeMissionService, type MissionService } from "../services/missionService.js";
 import { makePlayoffsService, type PlayoffsService } from "../services/playoffsService.js";
 import { makeSuddenDeathService, type SuddenDeathService } from "../services/suddenDeathService.js";
 import type { UnitOfWork } from "../ports/index.js";
@@ -55,6 +57,7 @@ export interface Container {
     powerups: PowerupService;
     shop: ShopService;
     potluck: PotluckService;
+    missions: MissionService;
   };
   authMiddleware: AuthMiddleware;
 }
@@ -78,6 +81,7 @@ export function buildContainer(env: Env): Container {
   const purchaseRepo = makePrismaPurchaseRepo();
   const potluckRsvpRepo = makePrismaPotluckRsvpRepo();
   const gamePowerupUseRepo = makePrismaGamePowerupUseRepo();
+  const missionRepo = makePrismaMissionRepo();
   const unitOfWork = makePrismaUnitOfWork();
 
   const hasher = makeBcryptHasher();
@@ -166,6 +170,7 @@ export function buildContainer(env: Env): Container {
   });
 
   const potluck = makePotluckService({ rsvps: potluckRsvpRepo, tournaments, users });
+  const missions = makeMissionService({ missions: missionRepo, memberships, users });
 
   const results = makeResultsService({
     tournaments,
@@ -219,6 +224,7 @@ export function buildContainer(env: Env): Container {
       powerups,
       shop,
       potluck,
+      missions,
     },
     authMiddleware: makeAuthMiddleware({ tokens, users }),
   };

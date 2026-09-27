@@ -30,7 +30,7 @@ export const NAV: NavItem[] = [
   { to: "/potluck", label: "Potluck", icon: "leaf" },
   { to: "/shop", label: "Shop", icon: "shop", requiresShopVisible: true },
   { to: "/inventory", label: "Inventory", icon: "layers", requiresShopVisible: true },
-  { to: "/missions", label: "Missions", icon: "target", comingSoon: true, phase: "Phase 2 · commissioner (US23–US24)" },
+  { to: "/missions", label: "Missions", icon: "target" },
   { to: "/admin", label: "Admin Panel", icon: "shield", roles: ["admin"] },
 ];
 

@@ -183,6 +183,26 @@ export interface BountyView {
   createdAt: string;
 }
 
+/* --- GET/POST/DELETE /api/admin/missions, GET/POST /api/missions --------- */
+
+/** A mission as an admin sees it, with the assigned player's name resolved. */
+export interface MissionView {
+  id: string;
+  userId: string;
+  playerName: string;
+  description: string;
+  prize: string;
+  createdAt: string;
+}
+
+/** A mission as the assigned player sees it — no need to name themselves. */
+export interface MyMissionView {
+  id: string;
+  description: string;
+  prize: string;
+  createdAt: string;
+}
+
 /* --- GET/POST/PATCH/DELETE /api/admin/powerups (shop catalog) ------------ */
 
 export interface PowerupView {

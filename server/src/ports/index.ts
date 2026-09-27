@@ -55,3 +55,4 @@ export type { PowerupRepo, PowerupRecord, NewPowerup, PowerupUpdate } from "./Po
 export type { PurchaseRepo, PurchaseRecord, NewPurchase } from "./PurchaseRepo.js";
 export type { PotluckRsvpRepo, PotluckRsvpRecord, UpsertPotluckRsvp } from "./PotluckRsvpRepo.js";
 export type { GamePowerupUseRepo } from "./GamePowerupUseRepo.js";
+export type { MissionRepo, MissionRecord, NewMission } from "./MissionRepo.js";

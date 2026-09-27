@@ -9,6 +9,7 @@ import type { SuddenDeathService } from "../../../../services/suddenDeathService
 import type { EconomyService } from "../../../../services/economyService.js";
 import type { BountyService } from "../../../../services/bountyService.js";
 import type { PowerupService } from "../../../../services/powerupService.js";
+import type { MissionService } from "../../../../services/missionService.js";
 import type { TournamentService } from "../../../../services/tournamentService.js";
 import type { AuthMiddleware } from "../middleware/auth.js";
 import { makeResolveTournament } from "../middleware/tournament.js";
@@ -86,6 +87,11 @@ const createBountySchema = z.object({
   coinValue: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
 });
 const awardBountySchema = z.object({ winnerId: z.string().min(1).optional() });
+const createMissionSchema = z.object({
+  userId: z.string().min(1),
+  description: safeText({ min: 1, max: 500 }),
+  prize: safeText({ min: 1, max: 200 }),
+});
 const createPowerupSchema = z.object({
   name: safeText({ min: 1, max: 60 }),
   description: safeText({ min: 1, max: 200 }),
@@ -148,6 +154,7 @@ export function adminRouter(
   economy: EconomyService,
   bounties: BountyService,
   powerups: PowerupService,
+  missions: MissionService,
   tournaments: TournamentService,
   mw: AuthMiddleware,
 ): Router {
@@ -475,6 +482,31 @@ export function adminRouter(
     "/powerups/:id",
     asyncHandler(async (req, res) => {
       await powerups.remove(req.tournamentId!, requireParam(req, "id"));
+      res.status(204).end();
+    }),
+  );
+
+  // --- Missions (US23: admin assigns a mission + prize to a player) -------
+
+  router.get(
+    "/missions",
+    asyncHandler(async (req, res) => {
+      res.json({ missions: await missions.listByTournament(req.tournamentId!) });
+    }),
+  );
+
+  router.post(
+    "/missions",
+    asyncHandler(async (req, res) => {
+      const input = parse(createMissionSchema, req.body);
+      res.status(201).json({ mission: await missions.create({ tournamentId: req.tournamentId!, ...input }) });
+    }),
+  );
+
+  router.delete(
+    "/missions/:id",
+    asyncHandler(async (req, res) => {
+      await missions.remove(req.tournamentId!, requireParam(req, "id"));
       res.status(204).end();
     }),
   );

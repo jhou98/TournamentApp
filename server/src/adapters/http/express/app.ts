@@ -17,6 +17,7 @@ import { leaderboardRouter } from "./routes/leaderboard.js";
 import { bountiesRouter } from "./routes/bounties.js";
 import { shopRouter } from "./routes/shop.js";
 import { potluckRouter } from "./routes/potluck.js";
+import { missionsRouter } from "./routes/missions.js";
 import { tournamentsRouter } from "./routes/tournaments.js";
 
 export function createApp(container: Container): Express {
@@ -57,6 +58,7 @@ export function createApp(container: Container): Express {
       container.services.economy,
       container.services.bounties,
       container.services.powerups,
+      container.services.missions,
       container.services.tournaments,
       container.authMiddleware,
     ),
@@ -90,6 +92,10 @@ export function createApp(container: Container): Express {
   api.use(
     "/potluck",
     potluckRouter(container.services.potluck, container.services.tournaments, container.authMiddleware),
+  );
+  api.use(
+    "/missions",
+    missionsRouter(container.services.missions, container.services.tournaments, container.authMiddleware),
   );
   app.use("/api", api);
 
