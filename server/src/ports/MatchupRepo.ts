@@ -1,4 +1,4 @@
-export type MatchupStage = "round_robin" | "semifinal" | "final";
+export type MatchupStage = "round_robin" | "semifinal" | "third_place" | "final";
 export type MatchupStatus = "scheduled" | "in_progress" | "final";
 
 export interface NewMatchup {

@@ -165,8 +165,8 @@ export function AdminSettings() {
         </div>
         {config.status === "playoffs" && (
           <Alert tone="info">
-            Playoffs are underway — manage lineups and enter scores from the Captain Panel and Results pages. The final is
-            created automatically once both semifinals finish.
+            Playoffs are underway — manage lineups and enter scores from the Captain Panel and Results pages. The final and
+            third-place game are created automatically once both semifinals finish.
           </Alert>
         )}
         {config.status === "completed" && <Alert tone="info">🏆 Tournament complete.</Alert>}

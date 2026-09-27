@@ -43,7 +43,7 @@ export function Results() {
   const champion = data?.matchups.find((m) => m.stage === "final" && m.winnerTeamName)?.winnerTeamName;
   const grouped: { label: string; stages: string[] }[] = [
     { label: "Round robin", stages: ["round_robin"] },
-    { label: "Playoffs", stages: ["semifinal", "final"] },
+    { label: "Playoffs", stages: ["semifinal", "third_place", "final"] },
   ];
 
   return (

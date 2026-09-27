@@ -2,12 +2,19 @@
  * Playoff bracket seeding (US11) — pure.
  *
  * Seeds a single-elimination bracket from final round-robin standings. The
- * matchup stage enum only models `semifinal | final`, so the bracket supports
- * **2 or 4 qualifiers**: 4 → two semifinals (#1v#4, #2v#3) feeding a final; 2 →
- * a final only. (Larger power-of-two brackets would need a `quarterfinal` stage.)
+ * matchup stage enum only models `semifinal | third_place | final`, so the
+ * bracket supports **2 or 4 qualifiers**: 4 → two semifinals (#1v#4, #2v#3)
+ * feeding a final AND a third-place game between the two semifinal losers;
+ * 2 → a final only (no semifinals, so no losers to play a third-place game).
+ * (Larger power-of-two brackets would need a `quarterfinal` stage.)
+ *
+ * Only the immediately-seedable matches (concrete teams known now) come back
+ * from this function — the final and third-place game are fed by semifinal
+ * results that don't exist yet, so `playoffsService.sync()` creates those two
+ * once both semifinals are decided, mirroring this same slot layout.
  */
 
-export type PlayoffStage = "semifinal" | "final";
+export type PlayoffStage = "semifinal" | "third_place" | "final";
 
 export interface BracketMatch {
   /** Stable slot id: "SF1", "SF2", "F". */

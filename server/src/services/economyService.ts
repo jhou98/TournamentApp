@@ -42,7 +42,12 @@ export interface EconomyServiceDeps {
 }
 
 /** Chronological ordering for streak sequencing: stage, then round, then id. */
-const STAGE_RANK: Record<MatchupView["stage"], number> = { round_robin: 0, semifinal: 1, final: 2 };
+const STAGE_RANK: Record<MatchupView["stage"], number> = {
+  round_robin: 0,
+  semifinal: 1,
+  third_place: 2,
+  final: 2,
+};
 
 function compareMatchupsChronologically(a: MatchupView, b: MatchupView): number {
   const stageDiff = STAGE_RANK[a.stage] - STAGE_RANK[b.stage];

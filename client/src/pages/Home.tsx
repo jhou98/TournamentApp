@@ -94,7 +94,7 @@ export function Home() {
     },
     playoffs: {
       title: "Playoffs are on!",
-      body: "Semifinals and the final. Most game wins advances; a 3–3 goes to a 1v1 overtime.",
+      body: "Semifinals, the third-place game, and the final. Most game wins advances; a 3–3 goes to a 1v1 overtime.",
     },
     completed: {
       title: champion ? `${champion} take the crown!` : "Tournament complete",
