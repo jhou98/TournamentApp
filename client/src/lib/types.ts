@@ -5,7 +5,7 @@
  */
 
 export type TournamentStatus = "setup" | "round_robin" | "playoffs" | "completed";
-export type Stage = "round_robin" | "semifinal" | "final";
+export type Stage = "round_robin" | "semifinal" | "third_place" | "final";
 
 /* --- GET /api/schedule --------------------------------------------------- */
 
@@ -288,6 +288,7 @@ export function coinReasonLabel(reason: CoinReason): string {
 
 export function stageLabel(stage: string, roundIndex?: number | null): string {
   if (stage === "semifinal") return "Semifinal";
+  if (stage === "third_place") return "Third Place";
   if (stage === "final") return "Final";
   return roundIndex ? `Round ${roundIndex}` : "Round robin";
 }

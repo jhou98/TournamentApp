@@ -322,6 +322,21 @@ describe("playoffsService.sync", () => {
     expect(stores.games.filter((g) => g.matchupId === final!.id)).toHaveLength(1);
   });
 
+  it("creates the third-place game between the two semifinal losers alongside the final", async () => {
+    await service.seed(TID, admin);
+    // SF1: A(seed1) v D(seed4) -> A wins, D loses. SF2: B(seed2) v C(seed3) -> B wins, C loses.
+    for (const slot of ["SF1", "SF2"]) {
+      const sf = stores.matchups.find((m) => m.bracketSlot === slot)!;
+      sf.status = "final";
+      sf.winnerTeamId = sf.teamAId;
+    }
+    await service.sync(TID);
+    const thirdPlace = stores.matchups.find((m) => m.stage === "third_place");
+    expect(thirdPlace).toBeTruthy();
+    expect([thirdPlace!.teamAId, thirdPlace!.teamBId]).toEqual(["D", "C"]);
+    expect(stores.games.filter((g) => g.matchupId === thirdPlace!.id)).toHaveLength(1);
+  });
+
   it("completes the tournament once the final is decided", async () => {
     await service.seed(TID, admin);
     for (const slot of ["SF1", "SF2"]) {

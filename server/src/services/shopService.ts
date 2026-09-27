@@ -37,7 +37,7 @@ export interface ShopServiceDeps {
 }
 
 /** Chronological ordering for "current game" lookup: stage, then round, then id. */
-const STAGE_RANK: Record<string, number> = { round_robin: 0, semifinal: 1, final: 2 };
+const STAGE_RANK: Record<string, number> = { round_robin: 0, semifinal: 1, third_place: 2, final: 2 };
 
 /** A catalog powerup as a player sees it: buyable, or already owned. */
 export interface ShopPowerupView {

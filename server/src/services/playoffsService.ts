@@ -141,11 +141,15 @@ export function makePlayoffsService(deps: PlayoffsServiceDeps): PlayoffsService 
       const bySlot = new Map(matchupViews.filter((m) => m.bracketSlot).map((m) => [m.bracketSlot!, m]));
       const final = bySlot.get("F");
 
-      // Create the final once both semifinals are decided (4-qualifier bracket).
+      // Create the final + third-place game once both semifinals are decided
+      // (4-qualifier bracket) — the third-place game pits the two semifinal
+      // losers against each other, alongside the winners' final.
       if (!final) {
         const sf1 = bySlot.get("SF1");
         const sf2 = bySlot.get("SF2");
         if (sf1?.winnerTeamId && sf2?.winnerTeamId) {
+          const sf1Loser = sf1.teamAId === sf1.winnerTeamId ? sf1.teamBId : sf1.teamAId;
+          const sf2Loser = sf2.teamAId === sf2.winnerTeamId ? sf2.teamBId : sf2.teamAId;
           const courts = await deps.courts.listByTournament(t.id);
           await deps.uow.run(async () => {
             const created = await deps.matchups.createMany(t.id, [
@@ -155,6 +159,13 @@ export function makePlayoffsService(deps: PlayoffsServiceDeps): PlayoffsService 
                 bracketSlot: "F",
                 teamAId: sf1.winnerTeamId!,
                 teamBId: sf2.winnerTeamId!,
+              },
+              {
+                stage: "third_place",
+                roundIndex: null,
+                bracketSlot: "3P",
+                teamAId: sf1Loser,
+                teamBId: sf2Loser,
               },
             ]);
             await createGames(

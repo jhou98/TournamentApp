@@ -25,6 +25,7 @@ enum MembershipRole {
 enum MatchupStage {
   round_robin
   semifinal
+  third_place
   final
 }
 
