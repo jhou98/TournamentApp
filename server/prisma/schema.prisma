@@ -428,17 +428,20 @@ model PotluckRsvp {
 }
 
 // A mission an admin writes and assigns to one player (US23, scoped down —
-// no auto coin credit, expiration, or status tracking yet). The player
-// completes it in person and shows the commissioner, who awards coins
-// manually via the existing coin-adjustment tool; "complete" here just
-// deletes the mission from the player's list.
+// no auto coin credit or expiration yet). The player completes it in person
+// and shows the commissioner, who awards coins manually via the existing
+// coin-adjustment tool. Marking it complete drops it from the player's own
+// list but keeps the row (flagged `completed`) so the admin can see it was
+// done and remove it themselves once the coins are handed out.
 model Mission {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   tournamentId String
   userId       String
   description  String
   prize        String
-  createdAt    DateTime @default(now())
+  completed    Boolean   @default(false)
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id])
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -192,6 +192,7 @@ export interface MissionView {
   playerName: string;
   description: string;
   prize: string;
+  completed: boolean;
   createdAt: string;
 }
 
