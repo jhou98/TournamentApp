@@ -42,6 +42,8 @@ function buildService(stores: Stores): MissionService {
         userId: m.userId,
         description: m.description,
         prize: m.prize,
+        completed: false,
+        completedAt: null,
         createdAt: new Date(`2026-02-0${stores.seq}T00:00:00.000Z`),
       };
       stores.missions.push(rec);
@@ -62,6 +64,12 @@ function buildService(stores: Stores): MissionService {
         .filter((m) => m.tournamentId === tournamentId && m.userId === userId)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
         .map((m) => ({ ...m }));
+    },
+    async markCompleted(id) {
+      const m = stores.missions.find((x) => x.id === id)!;
+      m.completed = true;
+      m.completedAt = new Date("2026-03-01T00:00:00.000Z");
+      return { ...m };
     },
     async delete(id) {
       stores.missions = stores.missions.filter((x) => x.id !== id);
@@ -182,16 +190,36 @@ describe("missionService.remove / complete", () => {
     expect(stores.missions).toHaveLength(0);
   });
 
-  it("lets the assigned player complete (delete) their own mission", async () => {
+  it("lets the assigned player complete their own mission — kept, flagged completed, dropped from their list", async () => {
     const mission = await service.create({ tournamentId: TID, userId: UID, description: "x", prize: "y" });
     await service.complete(TID, UID, mission.id);
-    expect(stores.missions).toHaveLength(0);
+
+    expect(stores.missions).toHaveLength(1);
+    expect(stores.missions[0]!.completed).toBe(true);
+    expect(await service.listForUser(TID, UID)).toHaveLength(0);
+
+    const adminView = await service.listByTournament(TID);
+    expect(adminView).toHaveLength(1);
+    expect(adminView[0]!.completed).toBe(true);
   });
 
   it("refuses to let another player complete someone else's mission", async () => {
     const mission = await service.create({ tournamentId: TID, userId: UID, description: "x", prize: "y" });
     await expect(service.complete(TID, "u2", mission.id)).rejects.toThrow();
-    expect(stores.missions).toHaveLength(1);
+    expect(stores.missions[0]!.completed).toBe(false);
+  });
+
+  it("refuses to complete an already-completed mission", async () => {
+    const mission = await service.create({ tournamentId: TID, userId: UID, description: "x", prize: "y" });
+    await service.complete(TID, UID, mission.id);
+    await expect(service.complete(TID, UID, mission.id)).rejects.toThrow(/already completed/i);
+  });
+
+  it("lets an admin remove a completed mission", async () => {
+    const mission = await service.create({ tournamentId: TID, userId: UID, description: "x", prize: "y" });
+    await service.complete(TID, UID, mission.id);
+    await service.remove(TID, mission.id);
+    expect(stores.missions).toHaveLength(0);
   });
 
   it("404s an unknown mission or one from another tournament", async () => {

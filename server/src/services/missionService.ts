@@ -2,9 +2,10 @@
  * Missions (US23, scoped down for now): an admin writes a mission and a prize
  * description, and assigns it to one player. The player does the mission in
  * person and shows the commissioner, who awards coins manually via the
- * existing coin-adjustment tool — completing a mission here just removes it
- * from the player's list (no automatic coin credit, status, or expiration
- * yet). Missions are only ever shown to the assigned player and to admins.
+ * existing coin-adjustment tool. Completing a mission drops it from the
+ * player's own list but keeps the row (flagged completed) so the admin can
+ * see it was done and remove it themselves once the coins are handed out.
+ * Missions are only ever shown to the assigned player and to admins.
  */
 
 import { NotFoundError, ValidationError } from "../domain/errors.js";
@@ -23,6 +24,7 @@ export interface MissionView {
   playerName: string;
   description: string;
   prize: string;
+  completed: boolean;
   createdAt: string;
 }
 
@@ -43,11 +45,13 @@ export interface CreateMissionInput {
 
 export interface MissionService {
   create(input: CreateMissionInput): Promise<MissionView>;
+  /** All missions in a tournament, completed and not (admin view). */
   listByTournament(tournamentId: string): Promise<MissionView[]>;
+  /** The caller's own not-yet-completed missions. */
   listForUser(tournamentId: string, userId: string): Promise<MyMissionView[]>;
-  /** Admin cancels/removes a mission outright. */
+  /** Admin cancels/removes a mission outright, completed or not. */
   remove(tournamentId: string, missionId: string): Promise<void>;
-  /** The assigned player marks it done (shown the commissioner in person) — deletes it. */
+  /** The assigned player marks it done (shown the commissioner in person). */
   complete(tournamentId: string, userId: string, missionId: string): Promise<void>;
 }
 
@@ -60,6 +64,7 @@ export function makeMissionService(deps: MissionServiceDeps): MissionService {
       playerName: user?.displayName ?? "(removed)",
       description: m.description,
       prize: m.prize,
+      completed: m.completed,
       createdAt: m.createdAt.toISOString(),
     };
   }
@@ -93,12 +98,14 @@ export function makeMissionService(deps: MissionServiceDeps): MissionService {
 
     async listForUser(tournamentId, userId) {
       const missions = await deps.missions.listByUser(tournamentId, userId);
-      return missions.map((m) => ({
-        id: m.id,
-        description: m.description,
-        prize: m.prize,
-        createdAt: m.createdAt.toISOString(),
-      }));
+      return missions
+        .filter((m) => !m.completed)
+        .map((m) => ({
+          id: m.id,
+          description: m.description,
+          prize: m.prize,
+          createdAt: m.createdAt.toISOString(),
+        }));
     },
 
     async remove(tournamentId, missionId) {
@@ -109,7 +116,8 @@ export function makeMissionService(deps: MissionServiceDeps): MissionService {
     async complete(tournamentId, userId, missionId) {
       const mission = await requireMission(tournamentId, missionId);
       if (mission.userId !== userId) throw new NotFoundError("Mission not found");
-      await deps.missions.delete(missionId);
+      if (mission.completed) throw new ValidationError("This mission is already completed");
+      await deps.missions.markCompleted(missionId);
     },
   };
 }

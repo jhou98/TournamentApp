@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import type { MissionView } from "../../lib/types";
 import { useToast } from "../../components/Toast";
-import { Alert, Button, Card, EmptyState, Field, Input, Select } from "../../components/ui";
+import { Alert, Button, Card, EmptyState, Field, Input, Pill, Select } from "../../components/ui";
 
 interface RosterMember {
   userId: string;
@@ -20,9 +20,9 @@ interface PlayerOption extends RosterMember {
 
 /**
  * Admin mission assignment (US23, scoped down): write a mission + prize and
- * assign it to one player. The player sees only their own; completing it in
- * their Missions page just removes it — coins are awarded manually via the
- * Coins tab once the commissioner has witnessed it.
+ * assign it to one player. Completing it in their Missions page removes it
+ * from the player's view and marks it "Completed" here, so the admin knows
+ * to award coins (via the Coins tab) and can then remove it.
  */
 export function AdminMissions() {
   const { activeTournamentId } = useAuth();
@@ -144,6 +144,7 @@ export function AdminMissions() {
                   <th>Player</th>
                   <th>Mission</th>
                   <th>Prize</th>
+                  <th>Status</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
@@ -153,6 +154,15 @@ export function AdminMissions() {
                     <td className="font-semibold">{m.playerName}</td>
                     <td className="text-ink-muted">{m.description}</td>
                     <td>{m.prize}</td>
+                    <td>
+                      {m.completed ? (
+                        <Pill tone="success" icon="check">
+                          Completed
+                        </Pill>
+                      ) : (
+                        <Pill tone="neutral">Assigned</Pill>
+                      )}
+                    </td>
                     <td>
                       <div className="flex justify-end">
                         <Button variant="ghost" size="sm" onClick={() => remove(m)}>

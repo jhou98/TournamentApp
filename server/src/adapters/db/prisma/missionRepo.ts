@@ -7,6 +7,8 @@ const RECORD_SELECT = {
   userId: true,
   description: true,
   prize: true,
+  completed: true,
+  completedAt: true,
   createdAt: true,
 } as const;
 
@@ -29,6 +31,13 @@ export function makePrismaMissionRepo(): MissionRepo {
       return getDb().mission.findMany({
         where: { tournamentId, userId },
         orderBy: { createdAt: "desc" },
+        select: RECORD_SELECT,
+      });
+    },
+    async markCompleted(id) {
+      return getDb().mission.update({
+        where: { id },
+        data: { completed: true, completedAt: new Date() },
         select: RECORD_SELECT,
       });
     },
