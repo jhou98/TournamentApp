@@ -11,9 +11,9 @@ import { Profile } from "./pages/Profile";
 import { Leaderboard } from "./pages/Leaderboard";
 import { Bounties } from "./pages/Bounties";
 import { Potluck } from "./pages/Potluck";
+import { Missions } from "./pages/Missions";
 import { Shop } from "./pages/Shop";
 import { Inventory } from "./pages/Inventory";
-import { ComingSoon } from "./pages/ComingSoon";
 import { TournamentHub } from "./pages/tournament/TournamentHub";
 import { Schedule } from "./pages/tournament/Schedule";
 import { Results } from "./pages/tournament/Results";
@@ -25,6 +25,7 @@ import { AdminTeams } from "./pages/admin/AdminTeams";
 import { AdminCoins } from "./pages/admin/AdminCoins";
 import { AdminBounties } from "./pages/admin/AdminBounties";
 import { AdminPowerups } from "./pages/admin/AdminPowerups";
+import { AdminMissions } from "./pages/admin/AdminMissions";
 import { AdminTournaments } from "./pages/admin/AdminTournaments";
 import { AdminSettings } from "./pages/admin/AdminSettings";
 
@@ -127,6 +128,7 @@ function Shell() {
           <Route path="coins" element={<AdminCoins />} />
           <Route path="bounties" element={<AdminBounties />} />
           <Route path="powerups" element={<AdminPowerups />} />
+          <Route path="missions" element={<AdminMissions />} />
           <Route path="tournaments" element={<AdminTournaments />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
@@ -152,8 +154,7 @@ function Shell() {
           }
         />
 
-        {/* Future phases — placeholders until the features ship (see lib/nav.ts). */}
-        <Route path="missions" element={<ComingSoon />} />
+        <Route path="missions" element={<Missions />} />
 
         {/* Legacy flat routes from the first UI. */}
         <Route path="schedule" element={<Navigate to="/tournament/schedule" replace />} />
