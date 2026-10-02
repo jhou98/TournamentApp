@@ -20,5 +20,8 @@ export function makePrismaUserRepo(): UserRepo {
       const user = await getDb().user.update({ where: { id }, data: { isAdmin } });
       return toPublicUser(user);
     },
+    async setPassword(id, passwordHash) {
+      await getDb().user.update({ where: { id }, data: { passwordHash } });
+    },
   };
 }

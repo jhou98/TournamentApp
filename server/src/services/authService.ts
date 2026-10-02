@@ -23,6 +23,13 @@ export interface LoginCommand {
   password: string;
 }
 
+export interface ResetPasswordCommand {
+  username: string;
+  /** The shared registration code (or bootstrap admin code, for an admin account). */
+  code: string;
+  newPassword: string;
+}
+
 export interface AuthResult {
   user: PublicUser;
   token: string;
@@ -53,6 +60,12 @@ export interface AuthServiceDeps {
 export interface AuthService {
   signup(cmd: SignupCommand): Promise<AuthResult>;
   login(cmd: LoginCommand): Promise<AuthResult>;
+  /**
+   * Self-serve password reset (no email/identity verification — gated by the
+   * same shared code used for signup; an admin account requires the bootstrap
+   * admin code instead, so resetting one isn't as easy as knowing a username).
+   */
+  resetPassword(cmd: ResetPasswordCommand): Promise<void>;
   me(userId: string, tournamentId: string | null): Promise<MeProfile>;
 }
 
@@ -131,6 +144,21 @@ export function makeAuthService(deps: AuthServiceDeps): AuthService {
         token: deps.tokens.sign({ userId: user.id }),
         role: deriveRole(user.isAdmin, null),
       };
+    },
+
+    async resetPassword({ username, code, newPassword }) {
+      const user = await deps.users.findByUsername(username);
+      // Generic failure either way — don't reveal whether the username exists.
+      const invalid = () => new ValidationError("Invalid username or code");
+      if (!user) throw invalid();
+
+      // An admin account needs the bootstrap admin code; everyone else needs
+      // the shared registration code — same gate as signup, keyed by role.
+      const requiredCode = user.isAdmin ? deps.bootstrapAdminCode : deps.registrationCode;
+      if (code.trim() !== requiredCode) throw invalid();
+
+      const passwordHash = await deps.hasher.hash(newPassword);
+      await deps.users.setPassword(user.id, passwordHash);
     },
 
     async me(userId, tournamentId) {

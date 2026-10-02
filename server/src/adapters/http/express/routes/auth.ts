@@ -17,6 +17,12 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const resetPasswordSchema = z.object({
+  username: z.string().trim().min(1),
+  code: z.string().trim().min(1),
+  newPassword: z.string().min(8).max(200),
+});
+
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function setAuthCookie(res: Response, token: string) {
@@ -49,6 +55,15 @@ export function authRouter(auth: AuthService): Router {
       const result = await auth.login(cmd);
       setAuthCookie(res, result.token);
       res.json({ user: result.user, role: result.role });
+    }),
+  );
+
+  router.post(
+    "/reset-password",
+    asyncHandler(async (req, res) => {
+      const cmd = parse(resetPasswordSchema, req.body);
+      await auth.resetPassword(cmd);
+      res.status(204).end();
     }),
   );
 

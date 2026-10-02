@@ -201,6 +201,9 @@ function buildService(stores: Stores): SuddenDeathService {
     async setAdmin() {
       throw new Error("not used");
     },
+    async setPassword() {
+      throw new Error("not used");
+    },
   };
 
   const games: GameRepo = {

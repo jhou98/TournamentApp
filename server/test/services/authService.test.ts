@@ -41,6 +41,10 @@ function fakeUserRepo(): UserRepo & { store: UserRecord[] } {
       const { passwordHash: _hash, ...rest } = u;
       return rest;
     },
+    async setPassword(id, passwordHash) {
+      const u = store.find((x) => x.id === id)!;
+      u.passwordHash = passwordHash;
+    },
   };
 }
 
@@ -254,6 +258,51 @@ describe("authService.login", () => {
     await expect(auth.login({ username: "ghost", password: "password123" })).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
+  });
+});
+
+describe("authService.resetPassword", () => {
+  it("resets a regular player's password with the shared registration code", async () => {
+    const users = fakeUserRepo();
+    const auth = build({ users });
+    await auth.signup({ username: "alice", password: "password123", displayName: "Alice", inviteCode: REGISTRATION });
+
+    await auth.resetPassword({ username: "alice", code: REGISTRATION, newPassword: "newpassword1" });
+    await expect(auth.login({ username: "alice", password: "password123" })).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    const result = await auth.login({ username: "alice", password: "newpassword1" });
+    expect(result.user.username).toBe("alice");
+  });
+
+  it("rejects the shared registration code for an admin account — requires the bootstrap code", async () => {
+    const users = fakeUserRepo();
+    const auth = build({ users });
+    await auth.signup({ username: "root", password: "password123", displayName: "Root", inviteCode: BOOTSTRAP });
+
+    await expect(
+      auth.resetPassword({ username: "root", code: REGISTRATION, newPassword: "newpassword1" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    await auth.resetPassword({ username: "root", code: BOOTSTRAP, newPassword: "newpassword1" });
+    const result = await auth.login({ username: "root", password: "newpassword1" });
+    expect(result.user.username).toBe("root");
+  });
+
+  it("rejects a wrong code", async () => {
+    const users = fakeUserRepo();
+    const auth = build({ users });
+    await auth.signup({ username: "alice", password: "password123", displayName: "Alice", inviteCode: REGISTRATION });
+    await expect(
+      auth.resetPassword({ username: "alice", code: "nope", newPassword: "newpassword1" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("rejects an unknown username without revealing whether it exists", async () => {
+    const auth = build();
+    await expect(
+      auth.resetPassword({ username: "ghost", code: REGISTRATION, newPassword: "newpassword1" }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 });
 

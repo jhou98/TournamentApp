@@ -92,6 +92,10 @@ function fakeUsers(seed: PublicUser[]): UserRepo {
       const { passwordHash: _h, ...rest } = u;
       return rest;
     },
+    async setPassword(id, passwordHash) {
+      const u = store.get(id)!;
+      u.passwordHash = passwordHash;
+    },
   };
 }
 
