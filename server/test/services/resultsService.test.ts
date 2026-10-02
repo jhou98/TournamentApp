@@ -227,6 +227,9 @@ function buildService(stores: Stores): ResultsService {
     async setAdmin() {
       throw new Error("not used");
     },
+    async setPassword() {
+      throw new Error("not used");
+    },
   };
 
   const courts: CourtRepo = {

@@ -116,6 +116,9 @@ function buildService(stores: Stores): MissionService {
     async setAdmin() {
       throw new Error("not used");
     },
+    async setPassword() {
+      throw new Error("not used");
+    },
   };
 
   return makeMissionService({ missions, memberships, users });

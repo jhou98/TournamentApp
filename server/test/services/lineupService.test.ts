@@ -255,6 +255,9 @@ function buildService(stores: Stores, rng?: () => number): LineupService {
     async setAdmin() {
       throw new Error("not used");
     },
+    async setPassword() {
+      throw new Error("not used");
+    },
   };
 
   const courts: CourtRepo = {

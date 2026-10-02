@@ -132,6 +132,9 @@ function buildService(stores: Stores): PotluckService {
     async setAdmin() {
       throw new Error("not used");
     },
+    async setPassword() {
+      throw new Error("not used");
+    },
   };
 
   return makePotluckService({ rsvps, tournaments, users });

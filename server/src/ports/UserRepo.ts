@@ -30,6 +30,7 @@ export interface UserRepo {
   findByUsername(username: string): Promise<UserRecord | null>;
   list(): Promise<PublicUser[]>;
   setAdmin(id: string, isAdmin: boolean): Promise<PublicUser>;
+  setPassword(id: string, passwordHash: string): Promise<void>;
 }
 
 export function toPublicUser(u: UserRecord): PublicUser {

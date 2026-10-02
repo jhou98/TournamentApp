@@ -192,6 +192,9 @@ function buildService(stores: Stores): BountyService {
     async setAdmin() {
       throw new Error("not used");
     },
+    async setPassword() {
+      throw new Error("not used");
+    },
   } satisfies UserRepo;
 
   return makeBountyService({ bounties, coinLedger, tournaments, teams, memberships, users, uow: passthroughUow });

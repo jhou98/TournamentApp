@@ -37,6 +37,7 @@ interface AuthContextValue {
     displayName: string;
     inviteCode?: string;
   }) => Promise<void>;
+  resetPassword: (input: { username: string; code: string; newPassword: string }) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -101,6 +102,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refresh();
   }
 
+  async function resetPassword(input: { username: string; code: string; newPassword: string }) {
+    await api("/auth/reset-password", { method: "POST", body: JSON.stringify(input) });
+  }
+
   async function logout() {
     await api("/auth/logout", { method: "POST" });
     setProfile(null);
@@ -117,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setActiveTournament,
         login,
         signup,
+        resetPassword,
         logout,
         refresh,
       }}

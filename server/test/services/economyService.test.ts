@@ -350,6 +350,9 @@ function buildService(stores: Stores): EconomyService {
     async setAdmin() {
       throw new Error("not used");
     },
+    async setPassword() {
+      throw new Error("not used");
+    },
   } satisfies UserRepo;
 
   const teams = {
