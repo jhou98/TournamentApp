@@ -262,6 +262,8 @@ export interface PotluckView {
   settings: PotluckSettings;
   myRsvp: MyPotluckRsvp | null;
   attendees: PotluckAttendee[];
+  /** Admin-only: names of everyone who said they're not attending. Null for non-admins. */
+  declined: string[] | null;
 }
 
 /* --- GET/PATCH /api/admin/tournament/rules ------------------------------- */

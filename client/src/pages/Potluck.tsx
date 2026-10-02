@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { PotluckView } from "../lib/types";
 import { useToast } from "../components/Toast";
-import { Alert, Button, Card, EmptyState, Field, Input, Loading, PageHeader, Segmented } from "../components/ui";
+import { Alert, Button, Card, EmptyState, Field, Input, Loading, PageHeader, Pill, Segmented } from "../components/ui";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -136,6 +136,22 @@ export function Potluck() {
               </div>
             )}
           </Card>
+
+          {view.declined !== null && (
+            <Card className="mt-5" title="Not attending" subtitle="Only visible to admins.">
+              {view.declined.length === 0 ? (
+                <p className="text-sm text-ink-muted">No one has said no yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {view.declined.map((name, i) => (
+                    <Pill key={`${name}-${i}`} tone="neutral">
+                      {name}
+                    </Pill>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
         </>
       )}
     </>

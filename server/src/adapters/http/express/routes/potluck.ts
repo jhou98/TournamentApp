@@ -26,7 +26,7 @@ export function potluckRouter(
   router.get(
     "/",
     asyncHandler(async (req, res) => {
-      res.json(await potluck.get(req.tournamentId!, req.user!.id));
+      res.json(await potluck.get(req.tournamentId!, req.user!));
     }),
   );
 

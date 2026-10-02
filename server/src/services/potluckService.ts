@@ -5,7 +5,7 @@
  */
 
 import { NotFoundError, ValidationError } from "../domain/errors.js";
-import type { PotluckRsvpRepo, TournamentRepo, UserRepo } from "../ports/index.js";
+import type { PotluckRsvpRepo, PublicUser, TournamentRepo, UserRepo } from "../ports/index.js";
 
 export interface PotluckServiceDeps {
   rsvps: PotluckRsvpRepo;
@@ -35,6 +35,8 @@ export interface PotluckView {
   myRsvp: MyRsvpView | null;
   /** Everyone who said they're attending, alphabetical, with what they're bringing. */
   attendees: PotluckAttendeeView[];
+  /** Admin-only: names of everyone who explicitly said they're not attending. Null for non-admins. */
+  declined: string[] | null;
 }
 
 export interface SetRsvpInput {
@@ -44,27 +46,37 @@ export interface SetRsvpInput {
 }
 
 export interface PotluckService {
-  get(tournamentId: string, userId: string): Promise<PotluckView>;
+  get(tournamentId: string, user: PublicUser): Promise<PotluckView>;
   setRsvp(tournamentId: string, userId: string, input: SetRsvpInput): Promise<MyRsvpView>;
 }
 
 export function makePotluckService(deps: PotluckServiceDeps): PotluckService {
   return {
-    async get(tournamentId, userId) {
+    async get(tournamentId, user) {
       const [tournament, myRsvp, all] = await Promise.all([
         deps.tournaments.getDetail(tournamentId),
-        deps.rsvps.findByUser(tournamentId, userId),
+        deps.rsvps.findByUser(tournamentId, user.id),
         deps.rsvps.listByTournament(tournamentId),
       ]);
       if (!tournament) throw new NotFoundError("Tournament not found");
 
       const attendees: PotluckAttendeeView[] = [];
       for (const r of all.filter((r) => r.attending)) {
-        const user = await deps.users.findById(r.userId);
-        if (!user) continue;
-        attendees.push({ displayName: user.displayName, item: r.item });
+        const attendee = await deps.users.findById(r.userId);
+        if (!attendee) continue;
+        attendees.push({ displayName: attendee.displayName, item: r.item });
       }
       attendees.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+      let declined: string[] | null = null;
+      if (user.isAdmin) {
+        declined = [];
+        for (const r of all.filter((r) => !r.attending)) {
+          const decliner = await deps.users.findById(r.userId);
+          if (decliner) declined.push(decliner.displayName);
+        }
+        declined.sort((a, b) => a.localeCompare(b));
+      }
 
       return {
         settings: {
@@ -73,6 +85,7 @@ export function makePotluckService(deps: PotluckServiceDeps): PotluckService {
         },
         myRsvp: myRsvp ? { attending: myRsvp.attending, item: myRsvp.item } : null,
         attendees,
+        declined,
       };
     },
 
