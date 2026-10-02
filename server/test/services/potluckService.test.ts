@@ -3,6 +3,7 @@ import { makePotluckService, type PotluckService } from "../../src/services/potl
 import type {
   PotluckRsvpRecord,
   PotluckRsvpRepo,
+  PublicUser,
   TournamentDetail,
   TournamentRepo,
   UpsertPotluckRsvp,
@@ -12,6 +13,10 @@ import type {
 
 const TID = "t1";
 const UID = "u1";
+
+function user(id: string, isAdmin = false): PublicUser {
+  return { id, username: id, displayName: id, isAdmin, createdAt: new Date() };
+}
 
 interface Stores {
   tournament: TournamentDetail;
@@ -144,7 +149,7 @@ describe("potluckService.get", () => {
   it("shows null settings until the admin sets them", async () => {
     const stores = freshStores();
     const service = buildService(stores);
-    const view = await service.get(TID, UID);
+    const view = await service.get(TID, user(UID));
     expect(view.settings).toEqual({ eventAt: null, address: null });
     expect(view.myRsvp).toBeNull();
     expect(view.attendees).toEqual([]);
@@ -155,7 +160,7 @@ describe("potluckService.get", () => {
     stores.tournament.potluckEventAt = new Date("2026-11-28T23:00:00.000Z");
     stores.tournament.potluckAddress = "123 Main St";
     const service = buildService(stores);
-    const view = await service.get(TID, UID);
+    const view = await service.get(TID, user(UID));
     expect(view.settings).toEqual({ eventAt: "2026-11-28T23:00:00.000Z", address: "123 Main St" });
   });
 
@@ -167,7 +172,7 @@ describe("potluckService.get", () => {
       { id: "r3", tournamentId: TID, userId: "u3", attending: false, item: null, updatedAt: new Date() },
     );
     const service = buildService(stores);
-    const view = await service.get(TID, UID);
+    const view = await service.get(TID, user(UID));
     expect(view.attendees).toEqual([
       { displayName: "Ann", item: "Salad" },
       { displayName: "Bob", item: "Chips" },
@@ -178,8 +183,29 @@ describe("potluckService.get", () => {
     const stores = freshStores();
     stores.rsvps.push({ id: "r1", tournamentId: TID, userId: UID, attending: false, item: null, updatedAt: new Date() });
     const service = buildService(stores);
-    const view = await service.get(TID, UID);
+    const view = await service.get(TID, user(UID));
     expect(view.myRsvp).toEqual({ attending: false, item: null });
+  });
+
+  it("hides the declined list from a non-admin", async () => {
+    const stores = freshStores();
+    stores.rsvps.push({ id: "r1", tournamentId: TID, userId: "u2", attending: false, item: null, updatedAt: new Date() });
+    const service = buildService(stores);
+    const view = await service.get(TID, user(UID));
+    expect(view.declined).toBeNull();
+  });
+
+  it("shows the declined list, alphabetically, to an admin", async () => {
+    const stores = freshStores();
+    stores.users.push(userRec("u3", "Cara"));
+    stores.rsvps.push(
+      { id: "r1", tournamentId: TID, userId: "u2", attending: false, item: null, updatedAt: new Date() },
+      { id: "r2", tournamentId: TID, userId: "u3", attending: false, item: null, updatedAt: new Date() },
+      { id: "r3", tournamentId: TID, userId: UID, attending: true, item: "Salad", updatedAt: new Date() },
+    );
+    const service = buildService(stores);
+    const view = await service.get(TID, user("admin1", true));
+    expect(view.declined).toEqual(["Bob", "Cara"]);
   });
 });
 
