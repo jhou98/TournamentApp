@@ -46,6 +46,8 @@ export interface BountyView {
   description: string;
   coinValue: number;
   active: boolean;
+  /** Admin-controlled: hidden from players' bounty list while false. */
+  visible: boolean;
   awardedAt: string | null;
   createdAt: string;
 }
@@ -69,7 +71,7 @@ export interface BountyService {
   create(input: CreateBountyInput): Promise<BountyView>;
   /** All of a tournament's bounties, newest first (target names resolved). */
   listByTournament(tournamentId: string): Promise<BountyView[]>;
-  /** Only the still-active bounties (what players see). */
+  /** Only the still-active, admin-visible bounties (what players see). */
   listActive(tournamentId: string): Promise<BountyView[]>;
   /**
    * Award a bounty. For an open bounty, `winnerId` is required and names the
@@ -77,6 +79,8 @@ export interface BountyService {
    * is ignored (the preset target is credited).
    */
   award(tournamentId: string, bountyId: string, winnerId?: string): Promise<AwardBountyResult>;
+  /** Toggle whether a bounty shows up in players' bounty list. */
+  setVisible(tournamentId: string, bountyId: string, visible: boolean): Promise<BountyView>;
   remove(tournamentId: string, bountyId: string): Promise<void>;
 }
 
@@ -112,6 +116,7 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
       description: b.description,
       coinValue: b.coinValue,
       active: b.active,
+      visible: b.visible,
       awardedAt: b.awardedAt ? b.awardedAt.toISOString() : null,
       createdAt: b.createdAt.toISOString(),
     }));
@@ -194,7 +199,7 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
       const all = await deps.bounties.listByTournament(tournamentId);
       return toViews(
         tournamentId,
-        all.filter((b) => b.active),
+        all.filter((b) => b.active && b.visible),
       );
     },
 
@@ -234,6 +239,13 @@ export function makeBountyService(deps: BountyServiceDeps): BountyService {
 
       const [view] = await toViews(tournamentId, [updated]);
       return { bounty: view!, recipients: recipientIds.length };
+    },
+
+    async setVisible(tournamentId, bountyId, visible) {
+      await requireBounty(tournamentId, bountyId);
+      const updated = await deps.bounties.setVisible(bountyId, visible);
+      const [view] = await toViews(tournamentId, [updated]);
+      return view!;
     },
 
     async remove(tournamentId, bountyId) {

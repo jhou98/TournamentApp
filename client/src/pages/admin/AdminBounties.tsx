@@ -114,6 +114,18 @@ export function AdminBounties() {
     }
   }
 
+  async function toggleVisible(b: BountyView) {
+    try {
+      await api(`/admin/bounties/${b.id}/visibility`, {
+        method: "PATCH",
+        body: JSON.stringify({ visible: !b.visible }),
+      });
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not update visibility", "error");
+    }
+  }
+
   async function remove(b: BountyView) {
     if (!window.confirm(`Delete bounty "${b.description}"?`)) return;
     try {
@@ -203,7 +215,7 @@ export function AdminBounties() {
       {bounties.length === 0 ? (
         <EmptyState icon="flag" title="No bounties yet" hint="Create one above to reward a play." />
       ) : (
-        <Card title="Bounties" subtitle="Active bounties are visible to players. Award one when it's earned.">
+        <Card title="Bounties" subtitle="Only visible, active bounties show up for players. Award one when it's earned.">
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
@@ -212,6 +224,7 @@ export function AdminBounties() {
                   <th>Target</th>
                   <th className="text-right">Coins</th>
                   <th>Status</th>
+                  <th>Visible</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
@@ -223,6 +236,7 @@ export function AdminBounties() {
                     players={players}
                     teams={teams}
                     onAward={award}
+                    onToggleVisible={toggleVisible}
                     onDelete={remove}
                   />
                 ))}
@@ -240,12 +254,14 @@ function BountyRow({
   players,
   teams,
   onAward,
+  onToggleVisible,
   onDelete,
 }: {
   bounty: BountyView;
   players: PlayerOption[];
   teams: TeamRoster[];
   onAward: (b: BountyView, winnerId?: string) => void;
+  onToggleVisible: (b: BountyView) => void;
   onDelete: (b: BountyView) => void;
 }) {
   const [winner, setWinner] = useState("");
@@ -289,6 +305,15 @@ function BountyRow({
             Awarded
           </Pill>
         )}
+      </td>
+      <td>
+        <input
+          type="checkbox"
+          checked={b.visible}
+          onChange={() => onToggleVisible(b)}
+          aria-label={b.visible ? "Visible to players" : "Hidden from players"}
+          title={b.visible ? "Visible to players" : "Hidden from players"}
+        />
       </td>
       <td>
         <div className="flex items-center justify-end gap-2">

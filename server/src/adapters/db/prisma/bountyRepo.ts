@@ -10,6 +10,7 @@ const RECORD_SELECT = {
   description: true,
   coinValue: true,
   active: true,
+  visible: true,
   awardedAt: true,
   createdAt: true,
 } as const;
@@ -35,6 +36,9 @@ export function makePrismaBountyRepo(): BountyRepo {
         data: { active: false, awardedAt: new Date(), ...(winnerId ? { targetId: winnerId } : {}) },
         select: RECORD_SELECT,
       });
+    },
+    async setVisible(id, visible) {
+      return getDb().bounty.update({ where: { id }, data: { visible }, select: RECORD_SELECT });
     },
     async delete(id) {
       await getDb().bounty.delete({ where: { id } });

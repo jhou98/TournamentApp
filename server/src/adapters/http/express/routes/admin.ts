@@ -87,6 +87,7 @@ const createBountySchema = z.object({
   coinValue: z.number().int().positive().max(MAX_COIN_ADJUSTMENT),
 });
 const awardBountySchema = z.object({ winnerId: z.string().min(1).optional() });
+const bountyVisibilitySchema = z.object({ visible: z.boolean() });
 const createMissionSchema = z.object({
   userId: z.string().min(1),
   description: safeText({ min: 1, max: 500 }),
@@ -442,6 +443,14 @@ export function adminRouter(
     asyncHandler(async (req, res) => {
       const { winnerId } = parse(awardBountySchema, req.body ?? {});
       res.json(await bounties.award(req.tournamentId!, requireParam(req, "id"), winnerId));
+    }),
+  );
+
+  router.patch(
+    "/bounties/:id/visibility",
+    asyncHandler(async (req, res) => {
+      const { visible } = parse(bountyVisibilitySchema, req.body);
+      res.json({ bounty: await bounties.setVisible(req.tournamentId!, requireParam(req, "id"), visible) });
     }),
   );
 

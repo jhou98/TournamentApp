@@ -179,6 +179,8 @@ export interface BountyView {
   description: string;
   coinValue: number;
   active: boolean;
+  /** Admin-controlled: hidden from players' bounty list while false. */
+  visible: boolean;
   awardedAt: string | null;
   createdAt: string;
 }

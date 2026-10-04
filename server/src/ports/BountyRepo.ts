@@ -14,6 +14,8 @@ export interface BountyRecord {
   description: string;
   coinValue: number;
   active: boolean;
+  /** Admin-controlled: hidden from players' bounty list while false. */
+  visible: boolean;
   awardedAt: Date | null;
   createdAt: Date;
 }
@@ -36,5 +38,6 @@ export interface BountyRepo {
    * Pass `winnerId` to record the winner of an open bounty in `targetId`.
    */
   markAwarded(id: string, winnerId?: string): Promise<BountyRecord>;
+  setVisible(id: string, visible: boolean): Promise<BountyRecord>;
   delete(id: string): Promise<void>;
 }

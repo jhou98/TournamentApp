@@ -361,6 +361,10 @@ model Bounty {
   // Free-form win conditions for future auto-detection (D17: admin marks complete for now).
   conditionMeta Json?
   active       Boolean          @default(true)
+  // Admin-controlled visibility, independent of `active`/awarded state — lets
+  // an admin hide a bounty from players (e.g. still being finalized) without
+  // touching its award status.
+  visible      Boolean          @default(true)
   awardedAt    DateTime?
   createdAt    DateTime         @default(now())
 

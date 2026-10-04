@@ -59,6 +59,7 @@ function buildService(stores: Stores): BountyService {
         description: b.description,
         coinValue: b.coinValue,
         active: true,
+        visible: true,
         awardedAt: null,
         createdAt: new Date(`2026-02-0${stores.seq}T00:00:00.000Z`),
       };
@@ -80,6 +81,11 @@ function buildService(stores: Stores): BountyService {
       b.active = false;
       b.awardedAt = new Date("2026-03-01T00:00:00.000Z");
       if (winnerId) b.targetId = winnerId;
+      return { ...b };
+    },
+    async setVisible(id, visible) {
+      const b = stores.bounties.find((x) => x.id === id)!;
+      b.visible = visible;
       return { ...b };
     },
     async delete(id) {
@@ -326,6 +332,32 @@ describe("bountyService.listActive / remove", () => {
     const bounty = await service.create({ tournamentId: TID, targetType: "player", targetId: "a1", description: "x", coinValue: 10 });
     await service.remove(TID, bounty.id);
     expect(stores.bounties).toHaveLength(0);
+  });
+
+  it("listActive hides bounties the admin has made invisible", async () => {
+    const b1 = await service.create({ tournamentId: TID, targetType: "player", targetId: "a1", description: "shown", coinValue: 10 });
+    const b2 = await service.create({ tournamentId: TID, targetType: "player", targetId: "a2", description: "hidden", coinValue: 10 });
+    await service.setVisible(TID, b2.id, false);
+
+    const active = await service.listActive(TID);
+    expect(active.map((b) => b.id)).toEqual([b1.id]);
+    // The admin's full list still shows both, with the flag reflected.
+    const all = await service.listByTournament(TID);
+    expect(all.find((b) => b.id === b2.id)?.visible).toBe(false);
+  });
+
+  it("setVisible toggles back and forth", async () => {
+    const bounty = await service.create({ tournamentId: TID, targetType: "player", targetId: "a1", description: "x", coinValue: 10 });
+    const hidden = await service.setVisible(TID, bounty.id, false);
+    expect(hidden.visible).toBe(false);
+    const shown = await service.setVisible(TID, bounty.id, true);
+    expect(shown.visible).toBe(true);
+  });
+
+  it("404s setVisible for an unknown bounty or one from another tournament", async () => {
+    await expect(service.setVisible(TID, "nope", false)).rejects.toThrow();
+    const bounty = await service.create({ tournamentId: TID, targetType: "player", targetId: "a1", description: "x", coinValue: 10 });
+    await expect(service.setVisible("otherTournament", bounty.id, false)).rejects.toThrow();
   });
 });
 
