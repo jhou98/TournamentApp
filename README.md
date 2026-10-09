@@ -71,4 +71,4 @@ required variables/secrets. Caddy/HTTPS is a planned follow-up — for now the a
 over the Elastic IP on the app port.
 
 ## Prod Setup
-- Amazon sign-in url: https://293532442953.signin.aws.amazon.com/console. Reach out to Jack for IAM user password. 
+- Reach out to Jack for IAM access
